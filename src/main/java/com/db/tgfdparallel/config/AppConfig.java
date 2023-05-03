@@ -18,8 +18,8 @@ public class AppConfig {
     @Value("${superStep")
     private int superStep;
 
-    @Value("${workers}")
-    private String[] workers;
+    @Value("#{'${workers}'.split(',')}")
+    private List<String> workers;
 
     @Value("#{'${splitGraphPath}'.split(',')}")
     private List<String> splitGraphPath;
@@ -45,5 +45,18 @@ public class AppConfig {
     @Value("${frequentEdges}")
     private int frequentEdges;
 
+    @Value("${mode}")
+    private String mode;
 
+    @Value("${bucketName}")
+    private String bucketName;
+
+    @Value("${HDFSName}")
+    private String HDFSName;
+
+    @Value("${HDFSAddress}")
+    private String HDFSAddress;
+
+    @Value("${HDFSPath}")
+    private String HDFSPath;
 }

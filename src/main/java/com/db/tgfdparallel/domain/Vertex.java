@@ -17,4 +17,8 @@ public class Vertex {
         this.uri = uri;
         this.types = types;
     }
+
+    public Vertex(String types) {
+        this.types = types;
+    }
 }

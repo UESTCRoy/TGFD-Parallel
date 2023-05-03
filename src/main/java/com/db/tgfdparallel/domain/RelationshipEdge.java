@@ -12,4 +12,14 @@ import org.jgrapht.graph.DefaultEdge;
 @AllArgsConstructor
 public class RelationshipEdge extends DefaultEdge {
         private String label;
+
+        @Override
+        public Vertex getTarget() {
+                return (Vertex) super.getTarget();
+        }
+
+        @Override
+        public Vertex getSource() {
+                return (Vertex) super.getSource();
+        }
 }
