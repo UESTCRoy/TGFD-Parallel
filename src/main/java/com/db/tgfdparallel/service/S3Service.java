@@ -5,15 +5,13 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class S3Service {
@@ -65,6 +63,48 @@ public class S3Service {
         return obj;
     }
 
+    public void uploadWholeTextFile(String bucketName, String key, String textToBeUploaded) {
+        try {
+            logger.info("Uploading to Amazon S3");
+
+            byte[] bytes = textToBeUploaded.getBytes(StandardCharsets.UTF_8);
+            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentLength(bytes.length);
+
+            PutObjectRequest request = new PutObjectRequest(bucketName, key, byteArrayInputStream, metadata)
+                    .withCannedAcl(CannedAccessControlList.PublicRead);
+
+            PutObjectResult result = s3Client.putObject(request);
+            logger.info("Uploading Done. [Bucket name: " + bucketName + "] [Key: " + key + "]");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public StringBuilder downloadWholeTextFile(String bucketName, String key) {
+        StringBuilder sb = new StringBuilder();
+
+        try {
+            logger.info("Downloading text file from Amazon S3 - Bucket name: " + bucketName + " - Key: " + key);
+
+            S3Object fullObject = s3Client.getObject(new GetObjectRequest(bucketName, key));
+
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(fullObject.getObjectContent()))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    sb.append(line).append("\n");
+                }
+            }
+
+            fullObject.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return sb;
+    }
+
     public static byte[] serializeObject(Object obj) throws IOException {
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
              ObjectOutputStream oos = new ObjectOutputStream(bos)) {
@@ -79,4 +119,5 @@ public class S3Service {
             return in.readObject();
         }
     }
+
 }

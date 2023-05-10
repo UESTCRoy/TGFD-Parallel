@@ -42,7 +42,7 @@ public class ChangeService {
     }
 
     public static void sortChanges(List<Change> changes) {
-        System.out.println("Number of changes: " + changes.size());
+        logger.info("Number of changes: " + changes.size());
 
         Map<ChangeType, Integer> sortOrderMap = new HashMap<ChangeType, Integer>() {{
             put(ChangeType.deleteAttr, 1);

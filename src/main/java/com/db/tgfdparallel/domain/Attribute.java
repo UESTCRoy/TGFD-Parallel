@@ -1,8 +1,10 @@
 package com.db.tgfdparallel.domain;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@NoArgsConstructor
 public class Attribute {
     private String attrName;
     private String attrValue;

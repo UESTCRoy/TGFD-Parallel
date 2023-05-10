@@ -2,11 +2,14 @@ package com.db.tgfdparallel.service;
 
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
+import com.db.tgfdparallel.utils.FileUtil;
+import org.jgrapht.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -115,9 +118,9 @@ public class DataShipperService {
                 String fileName = date + "_F" + id + "_to_" + key + ".txt";
 
                 if (isAmazonMode()) {
-                    s3Service.uploadObject(config.getBucketName(), fileName, sb.toString());
+                    s3Service.uploadWholeTextFile(config.getBucketName(), fileName, sb.toString());
                 } else {
-                    hdfsService.uploadObject(config.getHDFSPath(), fileName, sb.toString());
+                    hdfsService.uploadWholeTextFile(config.getHDFSPath(), fileName, sb.toString());
                 }
 
                 listOfFiles.get(id).add(fileName);
@@ -154,7 +157,7 @@ public class DataShipperService {
         String changeFileName = date + "_Change[" + snapshotID + "]" + ".ser";
         if (isAmazonMode()) {
             s3Service.uploadObject(config.getBucketName(), changeFileName, data);
-        } else  {
+        } else {
             hdfsService.uploadObject(config.getHDFSPath(), changeFileName, data);
         }
         return changeFileName;
@@ -166,20 +169,41 @@ public class DataShipperService {
 
     public void sendHistogramData(ProcessedHistogramData data) {
         if (isAmazonMode()) {
-            s3Service.uploadObject(config.getBucketName(), "vertexHistogram", data.getVertexHistogram());
-            s3Service.uploadObject(config.getBucketName(), "activeAttributesSet", data.getActiveAttributesSet());
-            s3Service.uploadObject(config.getBucketName(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
-            s3Service.uploadObject(config.getBucketName(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
-            s3Service.uploadObject(config.getBucketName(), "sortedVertexHistogram", data.getSortedVertexHistogram());
+//            s3Service.uploadObject(config.getBucketName(), "vertexHistogram", data.getVertexHistogram());
+//            s3Service.uploadObject(config.getBucketName(), "activeAttributesSet", data.getActiveAttributesSet());
+//            s3Service.uploadObject(config.getBucketName(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
+//            s3Service.uploadObject(config.getBucketName(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
+//            s3Service.uploadObject(config.getBucketName(), "sortedVertexHistogram", data.getSortedVertexHistogram());
+            s3Service.uploadObject(config.getBucketName(), "processedHistogramData", data);
         } else {
-            hdfsService.uploadObject(config.getHDFSPath(), "vertexHistogram", data.getVertexHistogram());
-            hdfsService.uploadObject(config.getHDFSPath(), "activeAttributesSet", data.getActiveAttributesSet());
-            hdfsService.uploadObject(config.getHDFSPath(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
-            hdfsService.uploadObject(config.getHDFSPath(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
-            hdfsService.uploadObject(config.getHDFSPath(), "sortedVertexHistogram", data.getSortedVertexHistogram());
+//            hdfsService.uploadObject(config.getHDFSPath(), "vertexHistogram", data.getVertexHistogram());
+//            hdfsService.uploadObject(config.getHDFSPath(), "activeAttributesSet", data.getActiveAttributesSet());
+//            hdfsService.uploadObject(config.getHDFSPath(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
+//            hdfsService.uploadObject(config.getHDFSPath(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
+//            hdfsService.uploadObject(config.getHDFSPath(), "sortedVertexHistogram", data.getSortedVertexHistogram());
+            hdfsService.uploadObject(config.getHDFSPath(), "processedHistogramData", data);
         }
 
         activeMQService.sendMessage("#histogramData");
+    }
+
+    public ProcessedHistogramData receiveHistogramData() {
+        boolean histogramStatsReceived = false;
+        ProcessedHistogramData data = null;
+        while (!histogramStatsReceived) {
+            try {
+                String msg = activeMQService.receive();
+                if (msg != null && msg.startsWith("#histogramData")) {
+                    histogramStatsReceived = true;
+                    data = isAmazonMode() ?
+                            (ProcessedHistogramData) s3Service.downloadObject(config.getBucketName(), "processedHistogramData") :
+                            (ProcessedHistogramData) hdfsService.downloadObject(config.getHDFSPath(), "processedHistogramData");
+                }
+            } catch (Exception e) {
+                logger.error("Error while receiving histogram data: {}", e.getMessage());
+            }
+        }
+        return data;
     }
 
     public String uploadSingleNodePattern(List<PatternTreeNode> patternTreeNodes) {
@@ -191,5 +215,92 @@ public class DataShipperService {
             hdfsService.uploadObject(config.getHDFSPath(), fileName, patternTreeNodes);
         }
         return fileName;
+    }
+
+    public List<PatternTreeNode> receiveSinglePatternNode() {
+        boolean singlePatternTreeNodesReceived = false;
+        List<PatternTreeNode> singlePatternTreeNodesList = new ArrayList<>();
+
+        while (!singlePatternTreeNodesReceived) {
+            try {
+                String msg = activeMQService.receive();
+                if (msg != null && msg.startsWith("#singlePattern")) {
+                    String fileName = msg.split("\t")[1];
+                    if (isAmazonMode()) {
+                        singlePatternTreeNodesList = FileUtil.castList(
+                                s3Service.downloadObject(config.getBucketName(), fileName), PatternTreeNode.class
+                        );
+                    } else {
+                        singlePatternTreeNodesList = FileUtil.castList(
+                                hdfsService.downloadObject(config.getHDFSPath(), fileName), PatternTreeNode.class
+                        );
+                    }
+
+                    logger.info("All single PatternTreeNodes have been received.");
+                    singlePatternTreeNodesReceived = true;
+                }
+            } catch (IOException e) {
+                logger.error("An IOException occurred while receiving single PatternTreeNodes.", e);
+            } catch (Exception e) {
+                logger.error("An exception occurred while receiving single PatternTreeNodes.", e);
+            }
+        }
+        return singlePatternTreeNodesList;
+    }
+
+    public HashMap<Integer, ArrayList<SimpleEdge>> readEdgesToBeShipped(String msg) {
+        HashMap<Integer, ArrayList<SimpleEdge>> dataToBeShipped = new HashMap<>();
+        String[] filePaths = msg.split("\n");
+
+        for (int i = 1; i < filePaths.length; i++) {
+            StringBuilder sb;
+            if (isAmazonMode()) {
+                sb = s3Service.downloadWholeTextFile(config.getBucketName(), filePaths[i]);
+            } else {
+                sb = hdfsService.downloadWholeTextFile(config.getHDFSPath(), filePaths[i]);
+            }
+
+            String[] lines = sb.toString().split("\n");
+            int workerID = Integer.parseInt(lines[0]);
+            logger.info("*DATA SENDER*: Reading data to be shipped to worker " + config.getWorkers().get(workerID - 1));
+
+            dataToBeShipped.computeIfAbsent(workerID, k -> new ArrayList<>());
+
+            for (int j = 1; j < lines.length; j++) {
+                String[] edgeParts = lines[j].split("\t");
+                dataToBeShipped.get(workerID).add(new SimpleEdge(edgeParts[0], edgeParts[1], edgeParts[2]));
+            }
+        }
+
+        return dataToBeShipped;
+    }
+
+    public void sendGraphToBeShippedToOtherWorkers(Graph<Vertex, RelationshipEdge> vertexRelationshipEdgeGraph, int workerID) {
+        LocalDateTime now = LocalDateTime.now();
+        String date = now.getHour() + "_" + now.getMinute() + "_" + now.getSecond();
+        String key = date + "_G_" + config.getNodeName() + "_to_" + config.getWorkers().get(workerID - 1) + ".ser";
+
+        if (isAmazonMode()) {
+            s3Service.uploadObject(config.getBucketName(), key, vertexRelationshipEdgeGraph);
+        } else {
+            hdfsService.uploadObject(config.getHDFSPath(), key, vertexRelationshipEdgeGraph);
+        }
+
+        activeMQService.connectProducer();
+        activeMQService.send(config.getWorkers().get(workerID - 1) + "_data", key);
+        activeMQService.closeProducer();
+        logger.info("*DATA SENDER*: Graph object has been sent to '" + config.getWorkers().get(workerID - 1) + "' successfully");
+    }
+
+    public Object downloadObject(String msg) throws IOException {
+        Object obj = null;
+
+        if (isAmazonMode()) {
+            obj = s3Service.downloadObject(config.getBucketName(), msg);
+        } else {
+            obj = hdfsService.downloadObject(config.getHDFSPath(), msg);
+        }
+
+        return obj;
     }
 }

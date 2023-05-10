@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -68,7 +68,6 @@ public class CoordinatorProcess {
 
         // Send the first level of pattern tree to the worker
         String fileName = dataShipperService.uploadSingleNodePattern(patternTreeNodes);
-
         // Send single pattern tree to the worker
         logger.info("Send single pattern tree to the worker");
         activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
@@ -78,7 +77,7 @@ public class CoordinatorProcess {
 
         // Define jobs and assign them to the workers
         Map<Integer, List<Job>> jobsByFragmentID = jobService.defineJobs(firstLoader, fragmentsForTheInitialLoad, patternTreeNodes);
-        jobService.jobAssigner(jobsByFragmentID);
+//        jobService.jobAssigner(jobsByFragmentID);
 
         // Send the edge data to the workers
         HashMap<Integer, ArrayList<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, jobsByFragmentID, fragmentsForTheInitialLoad);
@@ -91,15 +90,15 @@ public class CoordinatorProcess {
             changesToBeSentToAllWorkers.put(i + 2, changeFileName);
         }
 
-        changeShipperAndWaitResult();
+        changeShipperAndWaitResult(changesToBeSentToAllWorkers);
     }
 
-    public void changeShipperAndWaitResult() {
+    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {
         AtomicInteger superstep = new AtomicInteger(1);
-        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean resultGetter = new AtomicBoolean(false);
 
-        CompletableFuture<Void> changeShipperFuture = asyncService.changeShipper(superstep, latch);
-        CompletableFuture<Void> resultsGetterFuture = asyncService.resultsGetter(superstep, latch);
+        CompletableFuture<Void> changeShipperFuture = asyncService.changeShipper(changesToBeSentToAllWorkers, superstep, resultGetter);
+        CompletableFuture<Void> resultsGetterFuture = asyncService.resultsGetter(superstep, resultGetter);
 
         // Wait for both methods to complete
         CompletableFuture.allOf(changeShipperFuture, resultsGetterFuture).join();

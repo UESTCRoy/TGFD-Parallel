@@ -1,6 +1,7 @@
 package com.db.tgfdparallel.service;
 
 import com.db.tgfdparallel.config.AppConfig;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,10 +10,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 
 
 @Service
@@ -50,6 +50,68 @@ public class HDFSService {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public Object downloadObject(String directoryName, String fileName) {
+        Object obj = null;
+        try {
+            FileSystem fileSystem = FileSystem.get(conf);
+
+            FSDataInputStream inputStream = fileSystem.open(new Path(directoryName, fileName));
+            try (ObjectInputStream in = new ObjectInputStream(inputStream)) {
+                obj = in.readObject();
+            } catch (IOException e) {
+                logger.error("Error while reading the object from HDFS: " + e.getMessage());
+                return null;
+            } catch (ClassNotFoundException e) {
+                logger.error("Error while deserializing the object from HDFS: " + e.getMessage());
+                return null;
+            }
+
+            inputStream.close();
+        } catch (IOException e) {
+            logger.error("Error while accessing HDFS: " + e.getMessage());
+            return null;
+        }
+        return obj;
+    }
+
+    public StringBuilder downloadWholeTextFile(String directoryName, String fileName) {
+        StringBuilder sb = new StringBuilder();
+        try {
+
+            try (FileSystem fileSystem = FileSystem.get(conf)) {
+                Path hdfsReadPath = new Path(directoryName + fileName);
+                try (FSDataInputStream inputStream = fileSystem.open(hdfsReadPath);
+                     BufferedReader bufferedReader = new BufferedReader(
+                             new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = bufferedReader.readLine()) != null) {
+                        sb.append(line).append("\n");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return sb;
+    }
+
+    public void uploadWholeTextFile(String directoryName, String fileName, String textToBeUploaded) {
+        try {
+
+            try (FileSystem fileSystem = FileSystem.get(conf)) {
+                Path hdfsWritePath = new Path(directoryName + fileName);
+                try (FSDataOutputStream fsDataOutputStream = fileSystem.create(hdfsWritePath, true);
+                     BufferedWriter bufferedWriter = new BufferedWriter(
+                             new OutputStreamWriter(fsDataOutputStream, StandardCharsets.UTF_8))) {
+                    bufferedWriter.write(textToBeUploaded);
+                    bufferedWriter.newLine();
+                }
+            }
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
         }
     }
 

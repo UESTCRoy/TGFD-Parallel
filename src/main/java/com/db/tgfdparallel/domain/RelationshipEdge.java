@@ -22,4 +22,9 @@ public class RelationshipEdge extends DefaultEdge {
         public Vertex getSource() {
                 return (Vertex) super.getSource();
         }
+
+        public RelationshipEdge copy() {
+                // TODO: Do we need to copy the other two fields?
+                return new RelationshipEdge(this.label);
+        }
 }

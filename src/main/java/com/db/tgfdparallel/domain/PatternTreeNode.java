@@ -11,6 +11,6 @@ public class PatternTreeNode {
     private PatternTreeNode parentNode;
     private ArrayList<PatternTreeNode> subgraphParents;
     private PatternTreeNode centerVertexParent;
-    private String edgeString;
-    private boolean isPruned;
+//    private String edgeString;
+//    private boolean isPruned;
 }

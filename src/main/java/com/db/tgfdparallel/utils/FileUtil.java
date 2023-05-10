@@ -6,6 +6,8 @@ import org.json.JSONException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 public class FileUtil {
     public static JSONArray readJsonFile(String filePath) {
@@ -16,5 +18,16 @@ public class FileUtil {
             System.err.println("Error reading JSON file: " + e.getMessage());
             return null;
         }
+    }
+
+    public static <T> List<T> castList(Object obj, Class<T> clazz) {
+        List<T> result = new ArrayList<T>();
+        if (obj instanceof List<?>) {
+            for (Object o : (List<?>) obj) {
+                result.add(clazz.cast(o));
+            }
+            return result;
+        }
+        return null;
     }
 }

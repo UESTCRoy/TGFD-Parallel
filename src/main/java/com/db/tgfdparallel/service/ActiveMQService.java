@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class ActiveMQService {
+    // TODO: 解决什么时候close
     private static final Logger logger = LoggerFactory.getLogger(ActiveMQService.class);
     private final AppConfig config;
     private final Consumer consumer;
@@ -109,6 +110,21 @@ public class ActiveMQService {
             }
         }
         consumer.close();
+    }
+
+    public void sendStatus() {
+        logger.info("Worker '" + config.getNodeName() + "' is up and send status to the Coordinator");
+        connectProducer();
+        send("status", "up " + config.getNodeName());
+        logger.info("Status sent to the Coordinator successfully.");
+        closeProducer();
+    }
+
+    public void sendResult(int superStepNumber) {
+        connectProducer();
+        send("results" + superStepNumber, config.getNodeName() + "@" + superStepNumber);
+        logger.info("*WORKER*: SupersStep "+superStepNumber+" is done successfully");
+        closeProducer();
     }
 }
 

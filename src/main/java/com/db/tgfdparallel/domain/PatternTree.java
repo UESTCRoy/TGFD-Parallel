@@ -2,9 +2,9 @@ package com.db.tgfdparallel.domain;
 
 import lombok.Data;
 
-import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class PatternTree {
-    public ArrayList<ArrayList<PatternTreeNode>> tree;
+    public List<List<PatternTreeNode>> tree;
 }

@@ -7,7 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Service;
 
-import javax.jms.JMSException;
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,42 +20,42 @@ public class AsyncService {
     private static final Logger logger = LoggerFactory.getLogger(AsyncService.class);
     private final AppConfig config;
     private final ActiveMQService activeMQService;
+    private long ThreadIdealTime = 3000;
 
     @Autowired
     public AsyncService(AppConfig config, ActiveMQService activeMQService) {
+        this.config = config;
         this.activeMQService = activeMQService;
     }
 
-    public CompletableFuture<Void> changeShipper(AtomicInteger superstep, AtomicBoolean resultsGetterDone) {
+    public CompletableFuture<Void> changeShipper(Map<Integer, String> changesToBeSentToAllWorkers,AtomicInteger superstep, AtomicBoolean resultsGetterDone) {
         return CompletableFuture.runAsync(() -> {
             System.out.println("*DATA SHIPPER*: Edges are received to be shipped to the workers");
             try {
                 while (true) {
                     int currentSuperstep = superstep.get();
                     while (!changesToBeSentToAllWorkers.containsKey(currentSuperstep)) {
-                        Thread.sleep(Config.threadsIdleTime);
+                        Thread.sleep(ThreadIdealTime);
                         currentSuperstep = superstep.get();
                     }
 
                     // Wait for the ResultsGetter to update the superstep
                     while (!resultsGetterDone.get()) {
-                        Thread.sleep(Config.threadsIdleTime);
+                        Thread.sleep(ThreadIdealTime);
                     }
                     resultsGetterDone.set(false);
 
-                    Producer messageProducer = new Producer();
-                    messageProducer.connect();
+                    activeMQService.connectProducer();
                     StringBuilder message;
 
                     if (changesToBeSentToAllWorkers.containsKey(currentSuperstep)) {
                         message = new StringBuilder();
                         message.append("#change").append("\n").append(changesToBeSentToAllWorkers.get(currentSuperstep));
-                        for (String worker : Config.workers) {
-                            messageProducer.send(worker, message.toString());
+                        for (String worker : config.getWorkers()) {
+                            activeMQService.send(worker, message.toString());
                             System.out.println("*DataShipper*: Change objects have been shared with '" + worker + "' successfully");
                         }
                     }
-                    messageProducer.close();
                     System.out.println("*DataShipper*: All files are shared for the superstep: " + currentSuperstep);
                     changesToBeSentToAllWorkers.remove(currentSuperstep);
                     if (currentSuperstep == config.getTimestamp()) {
@@ -64,8 +65,6 @@ public class AsyncService {
                 System.out.println("*DataShipper*: All changes are shipped to the workers.");
             } catch (InterruptedException e) {
                 e.printStackTrace();
-            } catch (JMSException e) {
-                System.out.println("*DataShipper: JMS Exception occurred (DataShipper).  Shutting down coordinator.");
             }
         });
     }
@@ -79,11 +78,10 @@ public class AsyncService {
             }
             try {
                 while (true) {
-                    Consumer consumer = new Consumer();
-                    consumer.connect("results" + superstep.get());
+                    activeMQService.connectConsumer("results" + superstep.get());
 
                     System.out.println("*RESULTS GETTER*: Listening for new messages to get the results " + superstep.get());
-                    String msg = consumer.receive();
+                    String msg = activeMQService.receive();
                     System.out.println("*RESULTS GETTER*: Received a new message.");
                     if (msg != null) {
                         String[] temp = msg.split("@");
@@ -115,12 +113,12 @@ public class AsyncService {
                         if (superstep.get() > config.getTimestamp()) {
                             System.out.println("*RESULTS GETTER*: All done! No superstep remained.");
                             allDone.set(true);
-                            consumer.close();
+                            activeMQService.closeConsumer();
                             break;
                         }
                         System.out.println("*RESULTS GETTER*: Starting the new superstep! -> " + superstep.get());
                     }
-                    consumer.close();
+                    activeMQService.closeConsumer();
                 }
             } catch (Exception e) {
                 e.printStackTrace();

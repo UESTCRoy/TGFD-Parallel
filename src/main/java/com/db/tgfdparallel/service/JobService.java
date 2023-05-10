@@ -38,6 +38,7 @@ public class JobService {
         IntStream.rangeClosed(1, config.getWorkers().size())
                 .forEach(i -> jobsByFragmentID.put(i, new ArrayList<>()));
 
+        // TODO: The fragmentID of the job may not be useful ant all!
         for (PatternTreeNode ptn : singlePatternTreeNodes) {
             logger.info("PatternTreeNode with the center type: {}", ptn.getPattern().getCenterVertexType());
             String centerNodeType = ptn.getPattern().getCenterVertexType();
@@ -56,6 +57,7 @@ public class JobService {
         return jobsByFragmentID;
     }
 
+    // TODO: we might not need this function, because worker doesn't need jobs, it could only based on singleNodePattern
     public void jobAssigner(Map<Integer, List<Job>> jobsByFragmentID) {
         logger.info("*JOB ASSIGNER*: Jobs are received to be assigned to the workers");
 

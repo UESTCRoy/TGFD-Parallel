@@ -5,6 +5,9 @@ import com.db.tgfdparallel.domain.*;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.riot.RDFDataMgr;
 import org.jgrapht.Graph;
+import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
+import org.jgrapht.alg.isomorphism.VF2SubgraphIsomorphismInspector;
+import org.jgrapht.graph.DefaultDirectedGraph;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -13,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class GraphService {
@@ -334,4 +338,150 @@ public class GraphService {
             }
         }
     }
+
+    public Graph<Vertex, RelationshipEdge> getSubGraphWithinDiameter(Graph<Vertex, RelationshipEdge> graph, Vertex center, int diameter) {
+        Graph<Vertex, RelationshipEdge> subgraph = new DefaultDirectedGraph<>(RelationshipEdge.class);
+
+        List<Vertex> withinDiameter = new ArrayList<>();
+        // Define a HashMap to store visited vertices
+        HashMap<String, Integer> visited = new HashMap<>();
+
+        // Create a queue for BFS
+        LinkedList<Vertex> queue = new LinkedList<>();
+
+        // Mark the current node as visited with distance 0 and then enqueue it
+        visited.put(center.getUri(), 0);
+        queue.add(center);
+        // Store the center as the node within the diameter
+        withinDiameter.add(center);
+
+        Vertex v, w;
+        while (!queue.isEmpty()) {
+            // Dequeue a vertex from queue and get its distance
+            v = queue.poll();
+            int distance = visited.get(v.getUri());
+
+            // Get both outgoing and incoming edges
+            Set<RelationshipEdge> edges = new HashSet<>(graph.outgoingEdgesOf(v));
+            edges.addAll(graph.incomingEdgesOf(v));
+
+            for (RelationshipEdge edge : edges) {
+                w = getConnectedVertex(v, edge);
+                // Check if the vertex is not visited
+                // Check if the vertex is within the diameter
+                if (distance + 1 <= diameter && !visited.containsKey(w.getUri()) && graph.containsVertex(w)) {
+                    // Enqueue the vertex and add it to the visited set
+                    visited.put(w.getUri(), distance + 1);
+                    queue.add(w);
+                    withinDiameter.add(w);
+                }
+            }
+        }
+
+        for (Vertex vertex : withinDiameter) {
+            subgraph.addVertex(vertex);
+        }
+
+        for (Vertex source : withinDiameter) {
+            for (RelationshipEdge e : graph.outgoingEdgesOf(source)) {
+                if (visited.containsKey(e.getTarget().getUri()))
+                    subgraph.addEdge(e.getSource(), e.getTarget(), e);
+            }
+        }
+
+        return subgraph;
+    }
+
+    private Vertex getConnectedVertex(Vertex v, RelationshipEdge edge) {
+        if (v.equals(edge.getSource())) {
+            return edge.getTarget();
+        } else {
+            return edge.getSource();
+        }
+    }
+
+    public Graph<Vertex, RelationshipEdge> extractGraphToBeSent(GraphLoader graphLoader, ArrayList<SimpleEdge> edges) {
+        Graph<Vertex, RelationshipEdge> graphToBeSent = new DefaultDirectedGraph<>(RelationshipEdge.class);
+        HashSet<String> visited = new HashSet<>();
+
+        for (SimpleEdge edge : edges) {
+            Vertex src = addVertexToGraphIfNotVisited(graphLoader, graphToBeSent, visited, edge.getSrc());
+            Vertex dst = addVertexToGraphIfNotVisited(graphLoader, graphToBeSent, visited, edge.getDst());
+
+            if (src != null && dst != null) {
+                graphToBeSent.addEdge(src, dst, new RelationshipEdge(edge.getLabel()));
+            }
+        }
+        return graphToBeSent;
+    }
+
+    private Vertex addVertexToGraphIfNotVisited(GraphLoader graphLoader, Graph<Vertex, RelationshipEdge> graph, HashSet<String> visited, String nodeId) {
+        if (visited.contains(nodeId)) {
+            return null;
+        }
+
+        Vertex node = graphLoader.getGraph().getNodeMap().getOrDefault(nodeId, null);
+
+        if (node != null) {
+            graph.addVertex(node);
+            visited.add(nodeId);
+        }
+        return node;
+    }
+
+    public void mergeGraphs(VF2DataGraph base, Graph<Vertex, RelationshipEdge> inputGraph) {
+        inputGraph.vertexSet().forEach(inputVertex -> {
+            Vertex currentVertex = base.getNodeMap().getOrDefault(inputVertex.getUri(), null);
+
+            if (currentVertex == null) {
+                base.getGraph().addVertex(inputVertex);
+            } else {
+                currentVertex.setAttributes(inputVertex.getAttributes());
+                currentVertex.setTypes(inputVertex.getTypes());
+            }
+        });
+
+        inputGraph.edgeSet().forEach(e -> {
+            Vertex src = e.getSource();
+            Vertex dst = e.getTarget();
+
+            boolean exist = base.getGraph().outgoingEdgesOf(src).stream()
+                    .anyMatch(edge -> edge.getLabel().equals(e.getLabel()) &&
+                            (edge.getTarget()).getUri().equals(dst.getUri()));
+
+            if (!exist) {
+                base.getGraph().addEdge(src, dst, e);
+            }
+        });
+    }
+
+    public VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> checkIsomorphism(Graph<Vertex, RelationshipEdge> dataGraph, VF2PatternGraph pattern, boolean cacheEdges) {
+        return new VF2SubgraphIsomorphismInspector<>(dataGraph, pattern.getPattern(), Comparators.vertexComparator, Comparators.edgeComparator, cacheEdges);
+    }
+
+    public Attribute copyAttribute(Attribute attribute) {
+        Attribute newAttribute = new Attribute();
+        newAttribute.setAttrName(attribute.getAttrName());
+        newAttribute.setAttrValue(attribute.getAttrValue());
+        newAttribute.setNull(attribute.isNull());
+        return newAttribute;
+    }
+
+    public Vertex copyVertex(Vertex vertex) {
+        Vertex newVertex = new Vertex();
+        newVertex.setUri(vertex.getUri());
+        newVertex.setTypes(vertex.getTypes());
+        newVertex.setMarked(vertex.isMarked());
+
+        // Deep copy of attributes
+        Set<Attribute> newAttributes = vertex.getAttributes().stream()
+                .map(this::copyAttribute)
+                .collect(Collectors.toSet());
+
+        newVertex.setAttributes(newAttributes);
+
+        return newVertex;
+    }
+
+
 }
