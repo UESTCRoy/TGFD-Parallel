@@ -14,4 +14,8 @@ public class Attribute {
         this.attrName = attrName;
         this.attrValue = attrValue;
     }
+
+    public Attribute(String attrName) {
+        this.attrName = attrName;
+    }
 }
