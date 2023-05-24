@@ -23,11 +23,15 @@ public class GraphService {
     private static final Logger logger = LoggerFactory.getLogger(GraphService.class);
     private final AppConfig config;
     private final LoaderService loaderService;
+    private final ActiveMQService activeMQService;
+    private final DataShipperService dataShipperService;
 
     @Autowired
-    public GraphService(AppConfig config, LoaderService loaderService) {
+    public GraphService(AppConfig config, LoaderService loaderService, ActiveMQService activeMQService, DataShipperService dataShipperService) {
         this.config = config;
         this.loaderService = loaderService;
+        this.activeMQService = activeMQService;
+        this.dataShipperService = dataShipperService;
     }
 
     public Map<String, Integer> initializeFromSplitGraph(List<String> paths) {
@@ -483,5 +487,85 @@ public class GraphService {
         return newVertex;
     }
 
+    public void updateFirstSnapshot(GraphLoader graphLoader) {
+        boolean datashipper = false;
+        HashMap<Integer, ArrayList<SimpleEdge>> dataToBeShipped = new HashMap<>();
+        VF2DataGraph graph = graphLoader.getGraph();
 
+        try {
+            while (!datashipper) {
+                String msg = activeMQService.receive();
+                if (msg.startsWith("#datashipper")) {
+                    dataToBeShipped = dataShipperService.readEdgesToBeShipped(msg);
+                    logger.info("The data to be shipped has been received.");
+                    datashipper = true;
+                }
+            }
+
+            dataToBeShipped.forEach((workerID, edges) -> {
+                try {
+                    Graph<Vertex, RelationshipEdge> extractedGraph = extractGraphToBeSent(graphLoader, edges);
+                    dataShipperService.sendGraphToBeShippedToOtherWorkers(extractedGraph, workerID);
+                } catch (Exception e) {
+                    logger.error("Error while extracting and sending graph for workerID: " + workerID, e);
+                }
+            });
+
+            int receiveData = 0;
+            activeMQService.connectConsumer(config.getNodeName() + "_data");
+
+            while (receiveData < dataToBeShipped.size() - 1) {
+                logger.info("*WORKER*: Start reading data from other workers...");
+                String msg = activeMQService.receive();
+                logger.info("*WORKER*: Received a new message.");
+
+                if (msg != null) {
+                    logger.info("*DATA RECEIVER*: Graph object has been received from '" + msg + "' successfully");
+                    Object obj = dataShipperService.downloadObject(msg);
+                    if (obj != null) {
+                        Graph<Vertex, RelationshipEdge> receivedGraph = (Graph<Vertex, RelationshipEdge>) obj;
+                        logger.info("*WORKER*: Received a new graph.");
+                        if (receivedGraph != null) {
+                            mergeGraphs(graph, receivedGraph);
+                        }
+                    }
+                }
+                receiveData++;
+            }
+
+            activeMQService.sendResult(1);
+        } catch (Exception e) {
+            logger.error("Error while running first snapshot", e);
+        }
+    }
+
+    public GraphLoader updateNextSnapshot(int superStepNumber, GraphLoader baseLoader) {
+        boolean changeReceived = false;
+        List<Change> changeList = new ArrayList<>();
+
+        while (!changeReceived) {
+            try {
+                String msg = activeMQService.receive();
+                if (msg != null && msg.startsWith("#change")) {
+                    String fileName = msg.split("\n")[1];
+                    Object obj = dataShipperService.downloadObject(fileName);
+                    if (obj != null) {
+                        changeList = (List<Change>) obj;
+                        logger.info("List of changes have been received.");
+                        changeReceived = true;
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error while receiving changes for SuperStep " + superStepNumber, e);
+            }
+        }
+
+        try {
+            updateEntireGraph(baseLoader.getGraph(), changeList);
+            activeMQService.sendResult(superStepNumber);
+        } catch (Exception e) {
+            logger.error("Error while updating graph and sending results for SuperStep " + superStepNumber, e);
+        }
+        return baseLoader;
+    }
 }

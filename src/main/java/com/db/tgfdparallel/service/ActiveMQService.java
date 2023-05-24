@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class ActiveMQService {
-    // TODO: 解决什么时候close
+    // TODO: 解决什么时候close, singleton实现？
     private static final Logger logger = LoggerFactory.getLogger(ActiveMQService.class);
     private final AppConfig config;
     private final Consumer consumer;

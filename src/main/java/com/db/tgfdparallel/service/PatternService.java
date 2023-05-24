@@ -75,7 +75,7 @@ public class PatternService {
                                                 Map<String, PatternTreeNode> singlePatternTreeNodesMap,
                                                 Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                 Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
-                                                Map<Integer, Map<Integer, Job>> assignedJobsBySnapshot) {
+                                                Map<Integer, List<Job>> assignedJobsBySnapshot) {
         // TODO: how should we set the diameter?
         int diameter = 2;
 
@@ -94,7 +94,7 @@ public class PatternService {
 
                     Job job = new Job(vertex, ptn);
                     job.setSubgraph(subgraph);
-                    assignedJobsBySnapshot.get(snapshotID).put(0, job);
+                    assignedJobsBySnapshot.get(snapshotID).add(job);
 
                     matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
                 }
@@ -201,7 +201,7 @@ public class PatternService {
         }
     }
 
-    public static double calculatePatternSupport(Map<String, List<Integer>> entityURIs, double S, int T) {
+    public double calculatePatternSupport(Map<String, List<Integer>> entityURIs, double S, int T) {
         int numOfPossiblePairs = 0;
         for (Map.Entry<String, List<Integer>> entityUriEntry : entityURIs.entrySet()) {
             int numberOfAcrossMatchesOfEntity = (int) entityUriEntry.getValue().stream().filter(x -> x > 0).count();
@@ -215,20 +215,21 @@ public class PatternService {
         return calculateSupport(numOfPossiblePairs, S, T);
     }
 
-    public static double calculateSupport(double numerator, double S, int T) {
+    public double calculateSupport(double numerator, double S, int T) {
         double denominator = S * CombinatoricsUtils.binomialCoefficient(T + 1, 2);
         if (numerator > denominator)
             throw new IllegalArgumentException("numerator > denominator");
         return numerator / denominator;
     }
 
-    public VSpawnPattern vSpawnGenerator(Map<String, Set<String>> vertexTypesToActiveAttributesMap, List<String> edgeData, List<PatternTreeNode> nodes) {
-        VSpawnPattern pattern = new VSpawnPattern();
-        int previousLevelNodeIndex = nodes.size();
+    public List<VSpawnPattern> vSpawnGenerator(Map<String, Set<String>> vertexTypesToActiveAttributesMap, List<String> edgeData, PatternTree patternTree, int level) {
+        List<VSpawnPattern> vSpawnPatternList = new ArrayList<>();
+        List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
         // TODO: Set pattern Pruned?
         for (PatternTreeNode ptn : nodes) {
             for (String edge : edgeData) {
+                VSpawnPattern pattern = null;
                 // TODO: if ptn is pruned, we skip it.
                 String sourceVertexType = edge.split(" ")[0];
                 String targetVertexType = edge.split(" ")[2];
@@ -276,12 +277,52 @@ public class PatternService {
                     pattern.setOldPattern(ptn);
                     Graph<Vertex, RelationshipEdge> graph = ptn.getPattern().getPattern();
                     VF2PatternGraph newPattern = copyGraph(graph);
+                    if (targetVertex == null) {
+                        targetVertex = new Vertex(targetVertexType);
+                        addVertex(newPattern, targetVertex);
+                    } else {
+                        // TODO: 这步的意义？
+                        for (Vertex vertex : newPattern.getPattern().vertexSet()) {
+                            if (vertex.getTypes().contains(targetVertexType)) {
+                                targetVertex.setMarked(true);
+                                break;
+                            }
+                        }
+                    }
 
+                    RelationshipEdge newEdge = new RelationshipEdge(label);
+
+                    if (sourceVertex == null) {
+                        sourceVertex = new Vertex(sourceVertexType);
+                        addVertex(newPattern, sourceVertex);
+                    } else {
+                        for (Vertex vertex : newPattern.getPattern().vertexSet()) {
+                            if (vertex.getTypes().contains(sourceVertexType)) {
+                                sourceVertex.setMarked(true);
+                                break;
+                            }
+                        }
+                    }
+
+                    addEdge(graph, sourceVertex, targetVertex, newEdge);
+
+                    // TODO: 待优化：比较new pattern与之前pattern是否isomorphism，判断是否有存在必要
+//                    if (!isIsomorphicPattern(newPattern, Util.patternTree)) {
+//                        pv.setMarked(true);
+//                        System.out.println("Skip. Candidate pattern is an isomorph of existing pattern");
+//                        continue;
+//                    }
+
+                    // TODO: Mark这里的用处
+
+                    PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes);
+                    pattern.setNewPattern(patternTreeNode);
+                    vSpawnPatternList.add(pattern);
                 }
             }
         }
 
-        return pattern;
+        return vSpawnPatternList;
     }
 
     public boolean isDuplicateEdge(VF2PatternGraph pattern, String edgeType, String sourceType, String targetType) {
@@ -338,4 +379,92 @@ public class PatternService {
     public void addEdge(Graph<Vertex, RelationshipEdge> graph, Vertex v1, Vertex v2, RelationshipEdge edge) {
         graph.addEdge(v1, v2, edge);
     }
+
+    public PatternTreeNode initializeNewNode(VF2PatternGraph pattern, PatternTreeNode parentNode, String candidateEdgeString, List<PatternTreeNode> nodes) {
+        PatternTreeNode node = new PatternTreeNode(pattern, parentNode, candidateEdgeString);
+        findSubgraphParents(node, nodes);
+        findCenterVertexParent(node, nodes);
+        return node;
+    }
+
+    public void findSubgraphParents(PatternTreeNode node, List<PatternTreeNode> nodes) {
+        // TODO: 有没有必要给level0 赋subgraph?
+        List<String> newPatternEdges = node.getPattern().getPattern().edgeSet().stream()
+                .map(RelationshipEdge::toString)
+                .collect(Collectors.toList());
+
+        for (PatternTreeNode otherPatternNode : nodes) {
+            List<String> otherPatternEdges = otherPatternNode.getPattern().getPattern().edgeSet().stream()
+                    .map(RelationshipEdge::toString)
+                    .collect(Collectors.toList());
+
+            if (newPatternEdges.containsAll(otherPatternEdges)) {
+                StringBuilder sb = new StringBuilder("New pattern: ")
+                        .append(node.getPattern())
+                        .append(" is a child of subgraph parent pattern: ");
+                if (otherPatternNode.getPattern().getPattern().edgeSet().isEmpty()) {
+                    sb.append(otherPatternNode.getPattern().getPattern().vertexSet());
+                } else {
+                    sb.append(otherPatternNode.getPattern());
+                }
+                logger.info(sb.toString());
+                node.getSubgraphParents().add(otherPatternNode);
+            }
+        }
+    }
+
+    public void findCenterVertexParent(PatternTreeNode node, List<PatternTreeNode> nodes) {
+        System.out.println("Finding center vertex parent...");
+        Set<String> newPatternEdges = node.getPattern().getPattern().edgeSet().stream().map(Object::toString).collect(Collectors.toSet());
+        List<PatternTreeNode> almostParents = new ArrayList<>();
+        for (PatternTreeNode otherPatternNode : nodes) {
+            Set<String> otherPatternEdges = otherPatternNode.getPattern().getPattern().edgeSet().stream().map(Object::toString).collect(Collectors.toSet());
+            if (newPatternEdges.containsAll(otherPatternEdges)) {
+                almostParents.add(otherPatternNode);
+                if (otherPatternNode.getPattern().getCenterVertexType().equals(node.getPattern().getCenterVertexType())) {
+                    printParent(node, otherPatternNode);
+                    node.setCenterVertexParent(otherPatternNode);
+                    return;
+                }
+            }
+        }
+//        if (node.getCenterVertexParent() == null) {
+//            for (PatternTreeNode otherPatternNode : this.getTree().get(0)) {
+//                if (otherPatternNode.getPattern().getCenterVertexType().equals(node.getPattern().getCenterVertexType())) {
+//                    printParent(node, otherPatternNode);
+//                    node.setCenterVertexParent(otherPatternNode);
+//                    return;
+//                }
+//            }
+//        }
+    }
+
+    private void printParent(PatternTreeNode node, PatternTreeNode otherPatternNode) {
+        System.out.println("New pattern: " + node.getPattern());
+        if (otherPatternNode.getPattern().getPattern().edgeSet().size() == 0) {
+            System.out.println("is a child of center vertex parent pattern: " + otherPatternNode.getPattern().getPattern().vertexSet());
+        } else {
+            System.out.println("is a child of center vertex parent pattern: " + otherPatternNode.getPattern());
+        }
+    }
+
+    public static Set<ConstantLiteral> getActiveAttributesInPattern(Map<String, Set<String>> vertexTypesToActiveAttributesMap,
+                                                                    Set<Vertex> vertexSet, boolean considerURI) {
+        Set<ConstantLiteral> literals = new HashSet<>();
+        for (Vertex vertex : vertexSet) {
+            String vertexType = vertex.getTypes();
+            // If considerURI is true, add uri as an attribute
+            if (considerURI) literals.add(new ConstantLiteral(vertexType, "uri", null));
+
+            // Add all active attributes for this vertex type
+            Set<String> activeAttributes = vertexTypesToActiveAttributesMap.get(vertexType);
+            activeAttributes.stream()
+                    .map(attr -> new ConstantLiteral(vertexType, attr, null))
+                    .forEach(literals::add);
+
+        }
+        return literals;
+    }
+
+
 }

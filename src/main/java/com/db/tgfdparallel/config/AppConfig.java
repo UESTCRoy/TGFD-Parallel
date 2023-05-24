@@ -36,8 +36,11 @@ public class AppConfig {
     @Value("${k}")
     private int k;
 
-    @Value("${theta}")
-    private double theta;
+    @Value("${patternTheta}")
+    private double patternTheta;
+
+    @Value("${tgfdTheta}")
+    private double tgfdTheta;
 
     @Value("${activeAttribute}")
     private int activeAttributes;
