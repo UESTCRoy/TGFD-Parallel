@@ -539,32 +539,12 @@ public class GraphService {
         }
     }
 
-    public GraphLoader updateNextSnapshot(int superStepNumber, GraphLoader baseLoader) {
-        boolean changeReceived = false;
-        List<Change> changeList = new ArrayList<>();
-
-        while (!changeReceived) {
-            try {
-                String msg = activeMQService.receive();
-                if (msg != null && msg.startsWith("#change")) {
-                    String fileName = msg.split("\n")[1];
-                    Object obj = dataShipperService.downloadObject(fileName);
-                    if (obj != null) {
-                        changeList = (List<Change>) obj;
-                        logger.info("List of changes have been received.");
-                        changeReceived = true;
-                    }
-                }
-            } catch (Exception e) {
-                logger.error("Error while receiving changes for SuperStep " + superStepNumber, e);
-            }
-        }
-
+    public GraphLoader updateNextSnapshot(List<Change> changeList, GraphLoader baseLoader) {
         try {
             updateEntireGraph(baseLoader.getGraph(), changeList);
-            activeMQService.sendResult(superStepNumber);
+//            activeMQService.sendResult(superStepNumber);
         } catch (Exception e) {
-            logger.error("Error while updating graph and sending results for SuperStep " + superStepNumber, e);
+            logger.error("Error while updating graph and sending results" , e);
         }
         return baseLoader;
     }

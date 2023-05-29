@@ -69,75 +69,61 @@ public class AsyncService {
         });
     }
 
-    public CompletableFuture<Void> resultsGetter(AtomicInteger superstep, AtomicBoolean resultsGetterDone) {
-        return CompletableFuture.runAsync(() -> {
-            System.out.println("*RESULTS GETTER*: Coordinator listens to get the results back from the workers");
-            for (String worker_name : workersStatus.keySet()) {
-                if (!results.containsKey(worker_name))
-                    results.put(worker_name, new ArrayList<>());
-            }
-            try {
-                while (true) {
-                    activeMQService.connectConsumer("results" + superstep.get());
-
-                    System.out.println("*RESULTS GETTER*: Listening for new messages to get the results " + superstep.get());
-                    String msg = activeMQService.receive();
-                    System.out.println("*RESULTS GETTER*: Received a new message.");
-                    if (msg != null) {
-                        String[] temp = msg.split("@");
-                        if (temp.length == 2) {
-                            String worker_name = temp[0].toLowerCase();
-                            if (workersStatus.containsKey(worker_name)) {
-                                System.out.println("*RESULTS GETTER*: Results received from: '" + worker_name + "'");
-                                results.get(worker_name).add(temp[1]);
-                            } else {
-                                System.out.println("*RESULTS GETTER*: Unable to find the worker name: '" + worker_name + "' in workers list. " +
-                                        "Please update the list in the Config file.");
-                            }
-                        } else {
-                            System.out.println("*RESULTS GETTER*: Message corrupted: " + msg);
-                        }
-                    } else
-                        System.out.println("*RESULTS GETTER*: Error happened. message is null");
-
-                    boolean done = true;
-                    for (String worker_name : workersStatus.keySet()) {
-                        if (results.get(worker_name).size() != superstep.get()) {
-                            done = false;
-                            break;
-                        }
-                    }
-                    if (done) {
-                        superstep.set(superstep.get() + 1);
-                        resultsGetterDone.set(true); // Set the resultsGetterDone to true when superstep is updated
-                        if (superstep.get() > config.getTimestamp()) {
-                            System.out.println("*RESULTS GETTER*: All done! No superstep remained.");
-                            allDone.set(true);
-                            activeMQService.closeConsumer();
-                            break;
-                        }
-                        System.out.println("*RESULTS GETTER*: Starting the new superstep! -> " + superstep.get());
-                    }
-                    activeMQService.closeConsumer();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
-
-//    @Async
-//    public void changeShipper(AtomicInteger superstep) {
-//        // Place your ChangeShipper code here.
-//        // Access superstep directly since it's passed as a parameter.
-//        // ...
-//    }
+//    public CompletableFuture<Void> resultsGetter(AtomicInteger superstep, AtomicBoolean resultsGetterDone) {
+//        return CompletableFuture.runAsync(() -> {
+//            System.out.println("*RESULTS GETTER*: Coordinator listens to get the results back from the workers");
+//            for (String worker_name : workersStatus.keySet()) {
+//                if (!results.containsKey(worker_name))
+//                    results.put(worker_name, new ArrayList<>());
+//            }
+//            try {
+//                while (true) {
+//                    activeMQService.connectConsumer("results" + superstep.get());
 //
-//    @Async
-//    public void resultsGetter(AtomicInteger superstep) {
-//        // Place your ResultsGetter code here.
-//        // Access superstep directly since it's passed as a parameter.
-//        // ...
+//                    System.out.println("*RESULTS GETTER*: Listening for new messages to get the results " + superstep.get());
+//                    String msg = activeMQService.receive();
+//                    System.out.println("*RESULTS GETTER*: Received a new message.");
+//                    if (msg != null) {
+//                        String[] temp = msg.split("@");
+//                        if (temp.length == 2) {
+//                            String worker_name = temp[0].toLowerCase();
+//                            if (workersStatus.containsKey(worker_name)) {
+//                                System.out.println("*RESULTS GETTER*: Results received from: '" + worker_name + "'");
+//                                results.get(worker_name).add(temp[1]);
+//                            } else {
+//                                System.out.println("*RESULTS GETTER*: Unable to find the worker name: '" + worker_name + "' in workers list. " +
+//                                        "Please update the list in the Config file.");
+//                            }
+//                        } else {
+//                            System.out.println("*RESULTS GETTER*: Message corrupted: " + msg);
+//                        }
+//                    } else
+//                        System.out.println("*RESULTS GETTER*: Error happened. message is null");
+//
+//                    boolean done = true;
+//                    for (String worker_name : workersStatus.keySet()) {
+//                        if (results.get(worker_name).size() != superstep.get()) {
+//                            done = false;
+//                            break;
+//                        }
+//                    }
+//                    if (done) {
+//                        superstep.set(superstep.get() + 1);
+//                        resultsGetterDone.set(true); // Set the resultsGetterDone to true when superstep is updated
+//                        if (superstep.get() > config.getTimestamp()) {
+//                            System.out.println("*RESULTS GETTER*: All done! No superstep remained.");
+//                            allDone.set(true);
+//                            activeMQService.closeConsumer();
+//                            break;
+//                        }
+//                        System.out.println("*RESULTS GETTER*: Starting the new superstep! -> " + superstep.get());
+//                    }
+//                    activeMQService.closeConsumer();
+//                }
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        });
 //    }
+
 }

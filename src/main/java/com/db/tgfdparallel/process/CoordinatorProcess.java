@@ -8,14 +8,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class CoordinatorProcess {
@@ -28,12 +24,10 @@ public class CoordinatorProcess {
     private final JobService jobService;
     private final DataShipperService dataShipperService;
     private final ChangeService changeService;
-    private final AsyncService asyncService;
 
     @Autowired
     public CoordinatorProcess(AppConfig config, GraphService graphService, HistogramService histogramService, PatternService patternService,
-                              ActiveMQService activeMQService, JobService jobService, DataShipperService dataShipperService, ChangeService changeService,
-                              AsyncService asyncService) {
+                              ActiveMQService activeMQService, JobService jobService, DataShipperService dataShipperService, ChangeService changeService) {
         this.config = config;
         this.graphService = graphService;
         this.histogramService = histogramService;
@@ -42,19 +36,17 @@ public class CoordinatorProcess {
         this.jobService = jobService;
         this.dataShipperService = dataShipperService;
         this.changeService = changeService;
-        this.asyncService = asyncService;
     }
 
-    public void dataPreparation() {
-        logger.info("Data preparation started at {}", LocalDate.now());
-
+    public void start() {
         logger.info("Check the status of the workers");
         activeMQService.statusCheck();
 
-        // Generate all the changes for histogram computation and sending to the worker
-        List<List<Change>> changesData = changeService.chagneGenerator();
+        // Generate all the changes for histogram computation and send to all workers
+        List<List<Change>> changesData = changeService.changeGenerator();
+        logger.info("Generating change files for {} snapshots and got {} change files", config.getTimestamp(), changesData.size());
 
-        // Send the histogram data to the worker
+        // Generate histogram and send the histogram data to all workers
         String dataPath = config.getDataPath();
         logger.info("Load the first snapshot from the data path: {}", dataPath);
         GraphLoader firstLoader = graphService.loadFirstSnapshot(dataPath);
@@ -84,33 +76,30 @@ public class CoordinatorProcess {
         dataShipperService.edgeShipper(listOfFiles);
 
         // Send the changes to the workers
-        Map<Integer, String> changesToBeSentToAllWorkers = new HashMap<>();
+        // 不搞异步通过changeFile生成new graph，与worker确认巴拉巴拉，我们一次性把change上传，然后让worker逐步生成new graph
+        StringBuilder sb = new StringBuilder("#change");
         for (int i = 0; i < changesData.size(); i++) {
             String changeFileName = dataShipperService.changeShipped(changesData.get(i), i + 2);
-            changesToBeSentToAllWorkers.put(i + 2, changeFileName);
+            sb.append("\n").append(changeFileName);
+        }
+        for (String worker : config.getWorkers()) {
+            activeMQService.send(worker, sb.toString());
+            logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
-        changeShipperAndWaitResult(changesToBeSentToAllWorkers);
+        //TODO: 接收来自workers的constant TGFDs，然后处理
+
     }
 
-    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {
-        AtomicInteger superstep = new AtomicInteger(1);
-        AtomicBoolean resultGetter = new AtomicBoolean(false);
-
-        CompletableFuture<Void> changeShipperFuture = asyncService.changeShipper(changesToBeSentToAllWorkers, superstep, resultGetter);
-        CompletableFuture<Void> resultsGetterFuture = asyncService.resultsGetter(superstep, resultGetter);
-
-        // Wait for both methods to complete
-        CompletableFuture.allOf(changeShipperFuture, resultsGetterFuture).join();
-    }
-
-//    public void changeShipperAndWaitResult() {
+//    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {
 //        AtomicInteger superstep = new AtomicInteger(1);
+//        AtomicBoolean resultGetter = new AtomicBoolean(false);
 //
-//        asyncService.changeShipper(superstep);
-//        asyncService.resultsGetter(superstep);
+//        CompletableFuture<Void> changeShipperFuture = asyncService.changeShipper(changesToBeSentToAllWorkers, superstep, resultGetter);
+//        CompletableFuture<Void> resultsGetterFuture = asyncService.resultsGetter(superstep, resultGetter);
 //
-//        // You can add additional logic here if needed.
+//        // Wait for both methods to complete
+//        CompletableFuture.allOf(changeShipperFuture, resultsGetterFuture).join();
 //    }
 
 }

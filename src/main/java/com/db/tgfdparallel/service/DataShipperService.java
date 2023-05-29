@@ -12,10 +12,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class DataShipperService {
@@ -302,5 +299,47 @@ public class DataShipperService {
         }
 
         return obj;
+    }
+
+    public void uploadConstantTGFD(Map<Integer, Set<TGFD>> constantTGFDMap) {
+        String key = config.getNodeName() + "_constantTGFD";
+        if (isAmazonMode()) {
+            s3Service.uploadObject(config.getBucketName(), key, constantTGFDMap);
+        } else {
+            hdfsService.uploadObject(config.getBucketName(), key, constantTGFDMap);
+        }
+
+        logger.info("Worker " + config.getNodeName() + "finish!");
+        activeMQService.connectProducer();
+        activeMQService.send("constant-tgfd", config.getNodeName());
+        logger.info("Worker " + config.getNodeName() + "send constant tgfds back to coordinator successfully!");
+        activeMQService.closeProducer();
+    }
+
+    public List<List<Change>> receiveChangesFromCoordinator() {
+        List<List<Change>> changesData = new ArrayList<>();
+        boolean changeReceived = false;
+
+        while (!changeReceived) {
+            try {
+                String msg = activeMQService.receive();
+                if (msg != null && msg.startsWith("#change")) {
+                    String[] lines = msg.split("\n");
+                    String[] changeFiles = Arrays.copyOfRange(lines, 1, lines.length);
+
+                    for (String fileName : changeFiles) {
+                        Object obj = downloadObject(fileName);
+                        if (obj != null) {
+                            List<Change> changeList = (List<Change>) obj;
+                            changesData.add(changeList);
+                        }
+                    }
+                    changeReceived = true;
+                }
+            } catch (Exception e) {
+                logger.error("Error while receiving changes", e);
+            }
+        }
+        return changesData;
     }
 }
