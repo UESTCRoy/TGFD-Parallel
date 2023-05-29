@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 public class ChangeService {
@@ -24,21 +26,23 @@ public class ChangeService {
         this.graphService = graphService;
     }
 
-    public List<List<Change>> chagneGenerator() {
+    public List<List<Change>> changeGenerator() {
         String changeFilePath = config.getChangeFilePath();
-        List<String> changePaths = new ArrayList<>();
-        for (int i = 0; i < config.getTimestamp(); i++) {
-            String path = changeFilePath + "/changes_t" + i + "_t" + (i + 1) + "_" + "nospecifictgfds_full" + ".json";
-            changePaths.add(path);
-        }
-        List<List<Change>> changesData = new ArrayList<>();
-        for (String changePath : changePaths) {
-            JSONArray json = FileUtil.readJsonFile(changePath);
-            List<Change> changes = graphService.loadChanges(json, null, null, true);
-            sortChanges(changes);
-            changesData.add(changes);
-        }
-        return changesData;
+        int timestamp = config.getTimestamp();
+
+        return IntStream.range(0, timestamp)
+                .mapToObj(i -> {
+                    String path = changeFilePath + "/changes_t" + i + "_t" + (i + 1) + "_" + "nospecifictgfds_full" + ".json";
+                    JSONArray json = FileUtil.readJsonFile(path);
+                    if (json == null) {
+                        throw new RuntimeException("Failed to read JSON from file: " + path);
+                    } else {
+                        List<Change> changes = graphService.loadChanges(json, null, null, true);
+                        sortChanges(changes);
+                        return changes;
+                    }
+                })
+                .collect(Collectors.toList());
     }
 
     public static void sortChanges(List<Change> changes) {

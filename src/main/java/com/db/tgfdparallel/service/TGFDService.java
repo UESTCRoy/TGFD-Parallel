@@ -232,4 +232,13 @@ public class TGFDService {
         return numerator / denominator;
     }
 
+    public int getTGFDKey(DataDependency dependency) {
+        List<ConstantLiteral> collect = dependency.getX().stream().map(x -> (ConstantLiteral) x).sorted().collect(Collectors.toList());
+        StringBuilder sb = new StringBuilder();
+        for (ConstantLiteral data : collect) {
+            sb.append(data.getVertexType() + data.getAttrName() + data.getAttrValue());
+        }
+        return sb.hashCode();
+    }
+
 }

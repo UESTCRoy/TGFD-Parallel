@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -23,20 +24,23 @@ public class WorkerProcess {
     private final GraphService graphService;
     private final PatternService patternService;
     private final HSpawnService hSpawnService;
+    private final TGFDService tgfdService;
 
     @Autowired
     public WorkerProcess(AppConfig config, ActiveMQService activeMQService, DataShipperService dataShipperService, GraphService graphService,
-                         PatternService patternService, HSpawnService hSpawnService) {
+                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService) {
         this.config = config;
         this.activeMQService = activeMQService;
         this.dataShipperService = dataShipperService;
         this.graphService = graphService;
         this.patternService = patternService;
         this.hSpawnService = hSpawnService;
+        this.tgfdService = tgfdService;
     }
 
     public void start() {
         // Send the status to the coordinator
+        logger.info("{} send the status to Coordinator at {}", config.getNodeName(), LocalDateTime.now());
         activeMQService.sendStatus();
 
         // Receive the pattern tree from the coordinator
@@ -56,9 +60,11 @@ public class WorkerProcess {
         GraphLoader[] loaders = new GraphLoader[config.getTimestamp()];
         loaders[0] = graphLoader;
         graphService.updateFirstSnapshot(graphLoader);
-        for (int i = 1; i < config.getTimestamp(); i++) {
-            GraphLoader changeLoader = graphService.updateNextSnapshot(i + 1, graphLoader);
-            loaders[i] = changeLoader;
+
+        List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
+        for (int i = 0; i < changesData.size(); i++) {
+            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), graphLoader);
+            loaders[i + 1] = changeLoader;
         }
 
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
@@ -80,6 +86,7 @@ public class WorkerProcess {
 
         List<TGFD> constantTGFDs = new ArrayList<>();
         List<TGFD> generalTGFDs = new ArrayList<>();
+        Map<Integer, Set<TGFD>> constantTGFDMap = new HashMap<>();
 
         // Start VSpawn
         PatternTree patternTree = new PatternTree();
@@ -130,8 +137,22 @@ public class WorkerProcess {
 
                 // 计算新pattern的HSpawn
                 List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestampsByPTN.get(newPattern));
+                constantTGFDs.addAll(tgfds.get(0));
+                generalTGFDs.addAll(tgfds.get(1));
+            }
+
+            if (level > 1) {
+                for (TGFD data : constantTGFDs) {
+                    int hashKey = tgfdService.getTGFDKey(data.getDependency());
+                    Set<TGFD> tgfdSet = constantTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>());
+                    tgfdSet.add(data);
+                }
             }
         }
+
+        // Send data(Constant TGFDs) back to coordinator
+        dataShipperService.uploadConstantTGFD(constantTGFDMap);
+        logger.info(config.getNodeName() + "Done");
     }
 
     public void init(List<PatternTreeNode> patternTreeNodes,
