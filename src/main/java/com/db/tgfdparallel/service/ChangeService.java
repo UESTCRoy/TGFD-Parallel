@@ -30,7 +30,7 @@ public class ChangeService {
         String changeFilePath = config.getChangeFilePath();
         int timestamp = config.getTimestamp();
 
-        return IntStream.range(0, timestamp)
+        return IntStream.range(0, timestamp - 1)
                 .mapToObj(i -> {
                     String path = changeFilePath + "/changes_t" + i + "_t" + (i + 1) + "_" + "nospecifictgfds_full" + ".json";
                     JSONArray json = FileUtil.readJsonFile(path);

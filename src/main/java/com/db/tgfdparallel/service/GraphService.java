@@ -112,7 +112,7 @@ public class GraphService {
     }
 
     private void processEdgeChange(VF2DataGraph graph, ChangeType changeType, EdgeChange change) {
-        HashMap<String, Vertex> nodeMap = graph.getNodeMap();
+        Map<String, Vertex> nodeMap = graph.getNodeMap();
         Vertex srcVertex = nodeMap.getOrDefault(change.getSrcURI(), null);
         Vertex dstVertex = nodeMap.getOrDefault(change.getDstURI(), null);
 
@@ -162,7 +162,11 @@ public class GraphService {
         List<Change> allChanges = new ArrayList<>();
         for (Object o : jsonArray) {
             JSONObject object = (JSONObject) o;
-            Set<String> relevantTypes = new HashSet<>((Collection<? extends String>) object.get("types"));
+            JSONArray objectArray = (JSONArray) object.get("types");
+            Set<String> relevantTypes = new HashSet<>();
+            for(int i = 0; i < objectArray.length(); i++){
+                relevantTypes.add(objectArray.getString(i));
+            }
 
             ChangeType type = ChangeType.valueOf((String) object.get("typeOfChange"));
             int id = Integer.parseInt(object.get("id").toString());
@@ -236,7 +240,13 @@ public class GraphService {
 
     public Vertex getVertex(JSONObject vertexObj) {
         String uri = (String) vertexObj.get("vertexURI");
-        String type = (String) vertexObj.get("types");
+        // TODO: we only regard vertex has only one type, but a vertex could have multiple types
+        JSONArray typesArray = vertexObj.getJSONArray("types");
+        String type = null;
+        if(typesArray.length() > 0){
+            type = typesArray.getString(0);
+        }
+
 
         Set<Attribute> allAttributes = new HashSet<>();
         JSONArray allAttributeLists = (JSONArray) vertexObj.get("allAttributesList");

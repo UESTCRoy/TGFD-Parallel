@@ -10,9 +10,9 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GraphLoader {
-    private int graphSize;
     private VF2DataGraph graph;
-    private Set<String> validTypes;
-    private Set<String> validAttributes;
     private Set<String> types;
+//    private int graphSize;
+//    private Set<String> validTypes;
+//    private Set<String> validAttributes;
 }

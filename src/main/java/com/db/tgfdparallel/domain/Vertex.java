@@ -2,14 +2,19 @@ package com.db.tgfdparallel.domain;
 
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Data
 @NoArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Vertex {
+    @EqualsAndHashCode.Include
     private String uri;
+    @EqualsAndHashCode.Include
     private String types;
     private Set<Attribute> attributes;
     private boolean isMarked;
@@ -18,6 +23,7 @@ public class Vertex {
     public Vertex(String uri, String types) {
         this.uri = uri;
         this.types = types;
+        attributes = new HashSet<>();
     }
 
     public Vertex(String types) {

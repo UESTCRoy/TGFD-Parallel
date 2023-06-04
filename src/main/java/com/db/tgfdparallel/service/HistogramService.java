@@ -44,7 +44,6 @@ public class HistogramService {
     public void readGraphInfo(GraphLoader loader, HistogramData data) {
         int edgeCount = loader.getGraph().getGraph().edgeSet().size();
         logger.info("The number of edges " + edgeCount);
-        logger.info("The number of nodes " + loader.getGraphSize());
 
         Map<String, Integer> vertexTypesHistogram = new HashMap<>();
         Map<String, Set<String>> vertexTypesToAttributesMap = new HashMap<>();
