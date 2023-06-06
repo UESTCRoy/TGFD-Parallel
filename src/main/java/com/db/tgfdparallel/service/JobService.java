@@ -40,7 +40,6 @@ public class JobService {
 
         // TODO: The fragmentID of the job may not be useful ant all!
         for (PatternTreeNode ptn : singlePatternTreeNodes) {
-            logger.info("PatternTreeNode with the center type: {}", ptn.getPattern().getCenterVertexType());
             String centerNodeType = ptn.getPattern().getCenterVertexType();
             firstLoader.getGraph().getGraph().vertexSet().stream()
                     .filter(v -> v.getTypes().contains(centerNodeType))

@@ -40,7 +40,7 @@ public class LoaderService {
 
                 String[] temp = subjectNodeURL.split("/");
                 if (temp.length != 2) {
-                    System.out.println("Error: " + subjectNodeURL);
+                    logger.error("Error: " + subjectNodeURL);
                     continue;
                 }
                 String subjectType = temp[0];
@@ -53,7 +53,7 @@ public class LoaderService {
 
             }
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            logger.error(e.getMessage());
         }
         return loader;
     }
@@ -93,15 +93,14 @@ public class LoaderService {
                     v = new Vertex(nodeURI, nodeType);
                     dataGraph.addVertex(v);
                     nodeMap.put(nodeURI, v);
+                } else {
+                    v.getTypes().add(nodeType);
                 }
-//                else {
-//                    v.addType(nodeType);
-//                }
                 types.add(nodeType);
             }
             logger.info("Done. Number of Types: " + nodeMap.size());
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            logger.error(e.getMessage());
         }
     }
 
@@ -129,7 +128,8 @@ public class LoaderService {
                     Vertex objVertex = nodeMap.getOrDefault(objectNodeURI, null);
                     if (objVertex == null) {
                         continue;
-                    } else if (subjectNodeURI.equals(objectNodeURI)) {
+                    }
+                    if (subjectNodeURI.equals(objectNodeURI)) {
                         continue;
                     }
                     boolean edgeAdded = dataGraph.addEdge(subjVertex, objVertex, new RelationshipEdge(predicate));

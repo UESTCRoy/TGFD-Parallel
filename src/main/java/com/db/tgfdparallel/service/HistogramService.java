@@ -2,6 +2,8 @@ package com.db.tgfdparallel.service;
 
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
+import com.db.tgfdparallel.utils.DeepCopyUtil;
+import org.jgrapht.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,16 +25,18 @@ public class HistogramService {
         this.graphService = graphService;
     }
 
-    public ProcessedHistogramData computeHistogram(GraphLoader firstLoader, List<List<Change>> changesData) {
+    public ProcessedHistogramData computeHistogram(VF2DataGraph dataGraph, List<List<Change>> changesData) {
         HistogramData data = new HistogramData();
 
         logger.info("--------The snapshot(1)--------");
-        readGraphInfo(firstLoader, data);
+        readGraphInfo(dataGraph.getGraph(), data);
 
+        // We use deep copy here
         for (int i = 0; i < config.getTimestamp() - 1; i++) {
             logger.info("--------The snapshot(" + (i + 2) + ")--------");
-            graphService.updateEntireGraph(firstLoader.getGraph(), changesData.get(i));
-            readGraphInfo(firstLoader, data);
+            VF2DataGraph nextDataGraph = DeepCopyUtil.deepCopy(dataGraph);
+            graphService.updateEntireGraph(nextDataGraph, changesData.get(i));
+            readGraphInfo(nextDataGraph.getGraph(), data);
         }
 
         // TODO: finish the following method
@@ -41,8 +45,8 @@ public class HistogramService {
         return histogramData;
     }
 
-    public void readGraphInfo(GraphLoader loader, HistogramData data) {
-        int edgeCount = loader.getGraph().getGraph().edgeSet().size();
+    public void readGraphInfo(Graph<Vertex, RelationshipEdge> graph, HistogramData data) {
+        int edgeCount = graph.edgeSet().size();
         logger.info("The number of edges " + edgeCount);
 
         Map<String, Integer> vertexTypesHistogram = new HashMap<>();
@@ -52,16 +56,17 @@ public class HistogramService {
         Map<String, Integer> edgeTypesHistogram = new HashMap<>();
 
         // Load the graph's vertices and attributes
-        for (Vertex v : loader.getGraph().getGraph().vertexSet()) {
-            String vertexType = v.getTypes();
-            vertexTypesHistogram.merge(vertexType, 1, Integer::sum);
-            Set<String> attributeNames = v.getAttributes().stream()
-                    .map(Attribute::getAttrName)
-                    .filter(name -> !name.equals("uri"))
-                    .peek(attrName -> attrDistributionMap.computeIfAbsent(attrName, k -> new HashSet<>()).add(vertexType))
-                    .collect(Collectors.toSet());
-            vertexTypesToAttributesMap.computeIfAbsent(vertexType, k -> new HashSet<>()).addAll(attributeNames);
-            vertexTypesToInDegreesMap.computeIfAbsent(vertexType, k -> new ArrayList<>()).add(loader.getGraph().getGraph().incomingEdgesOf(v).size());
+        for (Vertex v : graph.vertexSet()) {
+            for (String vertexType : v.getTypes()) {
+                vertexTypesHistogram.merge(vertexType, 1, Integer::sum);
+                Set<String> attributeNames = v.getAttributes().stream()
+                        .map(Attribute::getAttrName)
+                        .filter(name -> !name.equals("uri"))
+                        .peek(attrName -> attrDistributionMap.computeIfAbsent(attrName, k -> new HashSet<>()).add(vertexType))
+                        .collect(Collectors.toSet());
+                vertexTypesToAttributesMap.computeIfAbsent(vertexType, k -> new HashSet<>()).addAll(attributeNames);
+                vertexTypesToInDegreesMap.computeIfAbsent(vertexType, k -> new ArrayList<>()).add(graph.incomingEdgesOf(v).size());
+            }
         }
 
         for (List<Integer> inDegrees : vertexTypesToInDegreesMap.values()) {
@@ -69,13 +74,17 @@ public class HistogramService {
         }
 
         // Load the graph's edges
-        for (RelationshipEdge edge : loader.getGraph().getGraph().edgeSet()) {
+        for (RelationshipEdge edge : graph.edgeSet()) {
             Vertex sourceVertex = edge.getSource();
             String predicateName = edge.getLabel();
             Vertex objectVertex = edge.getTarget();
 
-            String uniqueEdge = sourceVertex.getTypes() + " " + predicateName + " " + objectVertex.getTypes();
-            edgeTypesHistogram.merge(uniqueEdge, 1, Integer::sum);
+            for (String sourceVertexType : sourceVertex.getTypes()) {
+                for (String objectVertexType : objectVertex.getTypes()) {
+                    String uniqueEdge = sourceVertexType + " " + predicateName + " " + objectVertexType;
+                    edgeTypesHistogram.merge(uniqueEdge, 1, Integer::sum);
+                }
+            }
         }
 
         data.setVertexTypesHistogram(vertexTypesHistogram);
@@ -86,16 +95,14 @@ public class HistogramService {
     }
 
     //TODO: Sort the histogram data, and compare with the original data
-
     public ProcessedHistogramData performingRecordKeeping(HistogramData data) {
-        Map<String, Integer> vertexHistogram = new HashMap<>();
         Set<String> activeAttributesSet = setActiveAttributeSet(data.getAttrDistributionMap());
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = vertexTypesToActiveAttributesMap(data.getVertexTypesToAttributesMap(), activeAttributesSet);
-        List<FrequencyStatistics> sortedFrequentEdgesHistogram = setSortedFrequentEdgeHistogram(data.getEdgeTypesHistogram(), vertexTypesToActiveAttributesMap, data.getVertexTypesHistogram(), vertexHistogram);
-        List<FrequencyStatistics> sortedVertexHistogram = setSortedFrequentVerticesUsingFrequentEdges(sortedFrequentEdgesHistogram, data.getVertexTypesHistogram(), vertexHistogram);
+        List<FrequencyStatistics> sortedFrequentEdgesHistogram = setSortedFrequentEdgeHistogram(data.getEdgeTypesHistogram(), data.getVertexTypesHistogram());
+        List<FrequencyStatistics> sortedVertexHistogram = setSortedFrequentVerticesUsingFrequentEdges(sortedFrequentEdgesHistogram, data.getVertexTypesHistogram());
 
         ProcessedHistogramData histogramData = new ProcessedHistogramData();
-        histogramData.setVertexHistogram(vertexHistogram);
+        histogramData.setVertexHistogram(data.getVertexTypesHistogram());
         histogramData.setSortedFrequentEdgesHistogram(sortedFrequentEdgesHistogram);
         histogramData.setSortedVertexHistogram(sortedVertexHistogram);
         histogramData.setActiveAttributesSet(activeAttributesSet);
@@ -135,13 +142,15 @@ public class HistogramService {
         for (String vertexType : vertexTypesToAttributesMap.keySet()) {
             Set<String> attrNameSet = vertexTypesToAttributesMap.get(vertexType);
 
-            // Filters non-active attributes and adds them to the map
-            vertexTypesToActiveAttributesMap.put(
-                    vertexType,
-                    attrNameSet.stream()
-                            .filter(activeAttributesSet::contains)
-                            .collect(Collectors.toSet())
-            );
+            // Filters non-active attributes
+            Set<String> activeAttributes = attrNameSet.stream()
+                    .filter(activeAttributesSet::contains)
+                    .collect(Collectors.toSet());
+
+            // Only adds them to the map if there is at least one active attribute
+            if (!activeAttributes.isEmpty()) {
+                vertexTypesToActiveAttributesMap.put(vertexType, activeAttributes);
+            }
         }
 
         return vertexTypesToActiveAttributesMap;
@@ -151,26 +160,14 @@ public class HistogramService {
      * Sets the sorted frequent edge histogram for the graph.
      * Return vertexHistogram & sortedFrequentEdgesHistogram
      */
-    public List<FrequencyStatistics> setSortedFrequentEdgeHistogram(Map<String, Integer> edgeTypesHistogram,
-                                                                           Map<String, Set<String>> vertexTypesToActiveAttributesMap,
-                                                                           Map<String, Integer> vertexTypesHistogram,
-                                                                           Map<String, Integer> vertexHistogram) {
+    public List<FrequencyStatistics> setSortedFrequentEdgeHistogram(Map<String, Integer> edgeTypesHistogram, Map<String, Integer> vertexTypesHistogram) {
         List<FrequencyStatistics> finalEdgesHist = edgeTypesHistogram.entrySet().stream()
-                .filter(entry -> {
-                    String[] edgeString = entry.getKey().split(" ");
-                    String sourceType = edgeString[0];
-                    String targetType = edgeString[2];
-                    vertexHistogram.put(sourceType, vertexTypesHistogram.get(sourceType));
-                    vertexHistogram.put(targetType, vertexTypesHistogram.get(targetType));
-
-                    return vertexTypesToActiveAttributesMap.get(sourceType).size() > 0
-                            && vertexTypesToActiveAttributesMap.get(targetType).size() > 0;
-                })
                 .sorted((o1, o2) -> o2.getValue() - o1.getValue())
                 .map(entry -> new FrequencyStatistics(entry.getKey(), entry.getValue()))
                 .collect(Collectors.toList());
 
         int exclusiveIndex = Math.min(finalEdgesHist.size(), config.getFrequentEdges());
+
         return new ArrayList<>(finalEdgesHist.subList(0, exclusiveIndex));
     }
 
@@ -178,7 +175,8 @@ public class HistogramService {
      * Sets the sorted frequent vertices using frequent edges for the graph.
      * Return sortedVertexTypesHistogram
      */
-    public List<FrequencyStatistics> setSortedFrequentVerticesUsingFrequentEdges(List<FrequencyStatistics> sortedFrequentEdgesHistogram, Map<String, Integer> vertexTypesHistogram, Map<String, Integer> vertexHistogram) {
+    public List<FrequencyStatistics> setSortedFrequentVerticesUsingFrequentEdges(List<FrequencyStatistics> sortedFrequentEdgesHistogram,
+                                                                                 Map<String, Integer> vertexTypesHistogram) {
         Set<String> relevantFrequentVertexTypes = sortedFrequentEdgesHistogram.stream()
                 .flatMap(entry -> {
                     String[] edgeString = entry.getType().split(" ");
@@ -192,7 +190,6 @@ public class HistogramService {
                 .map(entry -> new FrequencyStatistics(entry.getKey(), entry.getValue()))
                 .collect(Collectors.toList());
 
-        sortedVertexTypesHistogram.forEach(entry -> vertexHistogram.put(entry.getType(), entry.getFrequency()));
         return sortedVertexTypesHistogram;
     }
 

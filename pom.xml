@@ -91,6 +91,12 @@
             <artifactId>hadoop-hdfs-client</artifactId>
             <version>3.2.1</version>
         </dependency>
+        <dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo</artifactId>
+            <version>5.0.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>

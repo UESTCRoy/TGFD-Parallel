@@ -40,7 +40,7 @@ public class CoordinatorProcess {
 
     public void start() {
         logger.info("Check the status of the workers");
-//        activeMQService.statusCheck();
+        activeMQService.statusCheck();
 
         // Generate all the changes for histogram computation and send to all workers
         List<List<Change>> changesData = changeService.changeGenerator();
@@ -49,27 +49,28 @@ public class CoordinatorProcess {
         // Generate histogram and send the histogram data to all workers
         String dataPath = config.getDataPath();
         logger.info("Load the first snapshot from the data path: {}", dataPath);
+        // TODO: create a deep copy of firstLoader here.
         GraphLoader firstLoader = graphService.loadFirstSnapshot(dataPath);
-        ProcessedHistogramData histogramData = histogramService.computeHistogram(firstLoader, changesData);
+        ProcessedHistogramData histogramData = histogramService.computeHistogram(firstLoader.getGraph(), changesData);
         logger.info("Send the histogram data to the worker");
-//        dataShipperService.sendHistogramData(histogramData);
+        dataShipperService.sendHistogramData(histogramData);
 
         // First Level initialization of the pattern tree
         PatternTree patternTree = new PatternTree();
         List<PatternTreeNode> patternTreeNodes = patternService.vSpawnSinglePatternTreeNode(histogramData, patternTree);
 
         // Send the first level of pattern tree to the worker
-//        String fileName = dataShipperService.uploadSingleNodePattern(patternTreeNodes);
+        String fileName = dataShipperService.uploadSingleNodePattern(patternTreeNodes);
         // Send single pattern tree to the worker
         logger.info("Send single pattern tree to the worker");
-//        activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
+        activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
 
         // Initialize the graph from the split graph, String (VertexURI) -> Integer (FragmentID)
         Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(config.getSplitGraphPath());
 
         // Define jobs and assign them to the workers
         Map<Integer, List<Job>> jobsByFragmentID = jobService.defineJobs(firstLoader, fragmentsForTheInitialLoad, patternTreeNodes);
-//        jobService.jobAssigner(jobsByFragmentID);
+        jobService.jobAssigner(jobsByFragmentID);
 
         // Send the edge data to the workers
         HashMap<Integer, ArrayList<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, jobsByFragmentID, fragmentsForTheInitialLoad);

@@ -14,20 +14,28 @@ import java.util.Set;
 public class Vertex {
     @EqualsAndHashCode.Include
     private String uri;
-    @EqualsAndHashCode.Include
-    private String types;
+//    @EqualsAndHashCode.Include
+    private Set<String> types;
     private Set<Attribute> attributes;
     private boolean isMarked;
 //    private Set<Integer> jobletID;
 
-    public Vertex(String uri, String types) {
+    public Vertex(String uri, String type) {
         this.uri = uri;
-        this.types = types;
-        attributes = new HashSet<>();
+        this.types = new HashSet<>();
+        this.types.add(type);
+        this.attributes = new HashSet<>();
     }
 
-    public Vertex(String types) {
+    public Vertex(String uri, Set<String> types, Set<Attribute> attributes) {
+        this.uri = uri;
         this.types = types;
+        this.attributes = attributes;
+    }
+
+    public Vertex(String type) {
+        this.types = new HashSet<>();
+        this.types.add(type);
     }
 
     // TODO: Can we just compare VertexURI?

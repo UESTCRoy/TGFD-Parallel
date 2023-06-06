@@ -45,21 +45,22 @@ public class TGFDService {
             }
 
             for (Vertex v : newPattern.getPattern().vertexSet()) {
-                String vType = v.getTypes();
-                if (vType.equalsIgnoreCase(yVertexType)) {
-                    v.getAttributes().add(new Attribute(yAttrName));
-                    if (newDependency.getY().size() == 0) {
-                        ConstantLiteral newY = new ConstantLiteral(yVertexType, yAttrName, attrValue);
-                        newDependency.getY().add(newY);
+                for (String vType : v.getTypes()) {
+                    if (vType.equalsIgnoreCase(yVertexType)) {
+                        v.getAttributes().add(new Attribute(yAttrName));
+                        if (newDependency.getY().size() == 0) {
+                            ConstantLiteral newY = new ConstantLiteral(yVertexType, yAttrName, attrValue);
+                            newDependency.getY().add(newY);
+                        }
                     }
-                }
 
-                ConstantLiteral xLiteral = vertexTypeToLiteral.get(vType);
-                if (xLiteral != null) {
-                    v.getAttributes().add(new Attribute(xLiteral.getAttrName(), xLiteral.getAttrValue()));
-                    ConstantLiteral newXLiteral = new ConstantLiteral(vType, xLiteral.getAttrName(), xLiteral.getAttrValue());
-                    newDependency.getX().add(newXLiteral);
-                    constantPath.getLhs().add(newXLiteral);
+                    ConstantLiteral xLiteral = vertexTypeToLiteral.get(vType);
+                    if (xLiteral != null) {
+                        v.getAttributes().add(new Attribute(xLiteral.getAttrName(), xLiteral.getAttrValue()));
+                        ConstantLiteral newXLiteral = new ConstantLiteral(vType, xLiteral.getAttrName(), xLiteral.getAttrValue());
+                        newDependency.getX().add(newXLiteral);
+                        constantPath.getLhs().add(newXLiteral);
+                    }
                 }
             }
             constantPath.setRhs(new ConstantLiteral(yVertexType, yAttrName, attrValue));

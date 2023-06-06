@@ -61,7 +61,7 @@ public class ChangeService {
 
         changes.sort(Comparator.comparing(change -> sortOrderMap.get(change.getChangeType())));
 
-        System.out.println("Sorted changes.");
+        logger.info("Sorted changes.");
     }
 
 }

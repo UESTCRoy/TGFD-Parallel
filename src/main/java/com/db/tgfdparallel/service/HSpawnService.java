@@ -63,7 +63,7 @@ public class HSpawnService {
 
                 // TODO: 啥是pruned
                 if (previousLiteral.isPruned()) {
-                    System.out.println("Could not expand pruned literal path.");
+                    logger.info("Could not expand pruned literal path.");
                     continue;
                 }
 
@@ -81,7 +81,7 @@ public class HSpawnService {
 
                     AttributeDependency newPath = new AttributeDependency(parentsPathToRoot, constantLiteral);
                     if (visitedPaths.contains(newPath)) { // TODO: Is this relevant anymore?
-                        System.out.println("Skip. Duplicate literal path.");
+                        logger.info("Skip. Duplicate literal path.");
                         continue;
                     }
 
@@ -142,11 +142,12 @@ public class HSpawnService {
                 .collect(Collectors.toMap(ConstantLiteral::getVertexType, Function.identity()));
 
         for (Vertex v : patternForDependency.getPattern().vertexSet()) {
-            String vType = v.getTypes();
-            ConstantLiteral constantLiteral = attributeMap.getOrDefault(vType, null);
-            if (constantLiteral != null) {
-                Attribute attribute = new Attribute(constantLiteral.getAttrName());
-                v.getAttributes().add(attribute);
+            for (String vType : v.getTypes()) {
+                ConstantLiteral constantLiteral = attributeMap.getOrDefault(vType, null);
+                if (constantLiteral != null) {
+                    Attribute attribute = new Attribute(constantLiteral.getAttrName());
+                    v.getAttributes().add(attribute);
+                }
             }
         }
     }

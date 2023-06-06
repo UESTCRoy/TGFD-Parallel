@@ -1,11 +1,14 @@
 package com.db.tgfdparallel.domain;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Attribute {
+    @EqualsAndHashCode.Include
     private String attrName;
     private String attrValue;
     private boolean isNull;
