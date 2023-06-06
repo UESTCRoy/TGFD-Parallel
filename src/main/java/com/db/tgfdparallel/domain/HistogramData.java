@@ -9,9 +9,9 @@ import java.util.Set;
 
 @Data
 public class HistogramData {
-    private Map<String, Integer> vertexTypesHistogram = new HashMap<>();
-    private Map<String, Set<String>> vertexTypesToAttributesMap = new HashMap<>();
-    private Map<String, Set<String>> attrDistributionMap = new HashMap<>();
-    private Map<String, List<Integer>> vertexTypesToInDegreesMap = new HashMap<>();
-    private Map<String, Integer> edgeTypesHistogram = new HashMap<>();
+    private Map<String, Integer> vertexTypesHistogram;
+    private Map<String, Set<String>> vertexTypesToAttributesMap;
+    private Map<String, Set<String>> attrDistributionMap;
+    private Map<String, List<Integer>> vertexTypesToInDegreesMap;
+    private Map<String, Integer> edgeTypesHistogram;
 }

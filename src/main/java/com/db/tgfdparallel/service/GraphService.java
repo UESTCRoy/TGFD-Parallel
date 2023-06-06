@@ -39,10 +39,10 @@ public class GraphService {
 
         for (int i = 0; i < paths.size(); i++) {
             String path = paths.get(i);
-            System.out.println("Loading graph from " + path);
+            logger.info("Loading graph from " + path);
 
             if (!path.toLowerCase().endsWith(".ttl") && !path.toLowerCase().endsWith(".nt")) {
-                System.out.println("File format not supported");
+                logger.info("File format not supported");
                 continue;
             }
             Model dataModel = RDFDataMgr.loadModel(path);
@@ -112,7 +112,7 @@ public class GraphService {
     }
 
     private void processEdgeChange(VF2DataGraph graph, ChangeType changeType, EdgeChange change) {
-        HashMap<String, Vertex> nodeMap = graph.getNodeMap();
+        Map<String, Vertex> nodeMap = graph.getNodeMap();
         Vertex srcVertex = nodeMap.getOrDefault(change.getSrcURI(), null);
         Vertex dstVertex = nodeMap.getOrDefault(change.getDstURI(), null);
 
@@ -144,15 +144,19 @@ public class GraphService {
             Attribute attr = attributeChange.getAttribute();
             Set<Attribute> attributes = vertex.getAttributes();
 
-            if (changeType == ChangeType.changeAttr || changeType == ChangeType.insertAttr) {
+            // TODO: equals() and hashCode() only work on attrName
+            if (changeType == ChangeType.insertAttr) {
                 attributes.add(attr);
             } else if (changeType == ChangeType.deleteAttr) {
                 attributes.remove(attr);
+            } else if (changeType == ChangeType.changeAttr) {
+                attributes.remove(attr);
+                attributes.add(attr);
             }
             vertex.setAttributes(attributes);
         } else {
             Vertex newVertex = ((TypeChange) change).getNewVertex();
-            String newType = newVertex.getTypes();
+            Set<String> newType = newVertex.getTypes();
             vertex.setTypes(newType);
         }
     }
@@ -162,7 +166,11 @@ public class GraphService {
         List<Change> allChanges = new ArrayList<>();
         for (Object o : jsonArray) {
             JSONObject object = (JSONObject) o;
-            Set<String> relevantTypes = new HashSet<>((Collection<? extends String>) object.get("types"));
+            JSONArray objectArray = (JSONArray) object.get("types");
+            Set<String> relevantTypes = new HashSet<>();
+            for(int i = 0; i < objectArray.length(); i++){
+                relevantTypes.add(objectArray.getString(i));
+            }
 
             ChangeType type = ChangeType.valueOf((String) object.get("typeOfChange"));
             int id = Integer.parseInt(object.get("id").toString());
@@ -236,10 +244,15 @@ public class GraphService {
 
     public Vertex getVertex(JSONObject vertexObj) {
         String uri = (String) vertexObj.get("vertexURI");
-        String type = (String) vertexObj.get("types");
+
+        Set<String> types = new HashSet<>();
+        JSONArray typesArray = vertexObj.getJSONArray("types");
+        for(int i = 0; i < typesArray.length(); i++){
+            types.add(typesArray.getString(i));
+        }
 
         Set<Attribute> allAttributes = new HashSet<>();
-        JSONArray allAttributeLists = (JSONArray) vertexObj.get("allAttributesList");
+        JSONArray allAttributeLists = vertexObj.getJSONArray("allAttributesList");
         for (Object allAttributeList : allAttributeLists) {
             JSONObject attrObject = (JSONObject) allAttributeList;
             String attrName = (String) attrObject.get("attrName");
@@ -247,9 +260,7 @@ public class GraphService {
             allAttributes.add(new Attribute(attrName, attrValue));
         }
 
-        Vertex vertex = new Vertex(uri, type);
-        vertex.setAttributes(allAttributes);
-        return vertex;
+        return new Vertex(uri, types, allAttributes);
     }
 
     public void addVertex(VF2DataGraph baseGraph, Vertex vertex) {

@@ -49,8 +49,9 @@ public class CoordinatorProcess {
         // Generate histogram and send the histogram data to all workers
         String dataPath = config.getDataPath();
         logger.info("Load the first snapshot from the data path: {}", dataPath);
+        // TODO: create a deep copy of firstLoader here.
         GraphLoader firstLoader = graphService.loadFirstSnapshot(dataPath);
-        ProcessedHistogramData histogramData = histogramService.computeHistogram(firstLoader, changesData);
+        ProcessedHistogramData histogramData = histogramService.computeHistogram(firstLoader.getGraph(), changesData);
         logger.info("Send the histogram data to the worker");
         dataShipperService.sendHistogramData(histogramData);
 
@@ -69,7 +70,7 @@ public class CoordinatorProcess {
 
         // Define jobs and assign them to the workers
         Map<Integer, List<Job>> jobsByFragmentID = jobService.defineJobs(firstLoader, fragmentsForTheInitialLoad, patternTreeNodes);
-//        jobService.jobAssigner(jobsByFragmentID);
+        jobService.jobAssigner(jobsByFragmentID);
 
         // Send the edge data to the workers
         HashMap<Integer, ArrayList<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, jobsByFragmentID, fragmentsForTheInitialLoad);

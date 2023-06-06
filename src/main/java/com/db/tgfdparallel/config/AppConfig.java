@@ -15,8 +15,8 @@ public class AppConfig {
     @Value("${dataset}")
     private String dataset;
 
-    @Value("${superStep")
-    private int superStep;
+//    @Value("${superStep")
+//    private int superStep;
 
     @Value("#{'${workers}'.split(',')}")
     private List<String> workers;

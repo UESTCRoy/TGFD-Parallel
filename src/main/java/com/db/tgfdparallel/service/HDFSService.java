@@ -111,7 +111,7 @@ public class HDFSService {
                 }
             }
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            logger.error(e.getMessage());
         }
     }
 
