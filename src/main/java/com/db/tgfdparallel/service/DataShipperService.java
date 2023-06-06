@@ -30,12 +30,12 @@ public class DataShipperService {
         this.s3Service = s3Service;
     }
 
-    public HashMap<Integer, ArrayList<String>> dataToBeShippedAndSend(int batchSize, Map<Integer, List<Job>> jobsByFragmentID, Map<String, Integer> fragments) {
-        HashMap<Integer, HashMap<Integer, ArrayList<SimpleEdge>>> batchDataToBeShipped = new HashMap<>();
-        HashMap<Integer, ArrayList<String>> listOfFiles = new HashMap<>();
+    public Map<Integer, List<String>> dataToBeShippedAndSend(int batchSize, Map<Integer, List<Job>> jobsByFragmentID, Map<String, Integer> fragments) {
+        Map<Integer, Map<Integer, List<SimpleEdge>>> batchDataToBeShipped = new HashMap<>();
+        Map<Integer, List<String>> listOfFiles = new HashMap<>();
 
         for (int i : jobsByFragmentID.keySet()) {
-            HashMap<Integer, ArrayList<SimpleEdge>> innerMap = new HashMap<>();
+            Map<Integer, List<SimpleEdge>> innerMap = new HashMap<>();
             for (int j : jobsByFragmentID.keySet()) {
                 if (i != j) {
                     innerMap.put(j, new ArrayList<>());
@@ -88,7 +88,7 @@ public class DataShipperService {
     }
 
     // TODO: Solve duplicate fileName date is not enough!
-    public void sendEdgesToWorkersForShipment(HashMap<Integer, HashMap<Integer, ArrayList<SimpleEdge>>> dataToBeShipped, HashMap<Integer, ArrayList<String>> listOfFiles) {
+    public void sendEdgesToWorkersForShipment(Map<Integer, Map<Integer, List<SimpleEdge>>> dataToBeShipped, Map<Integer, List<String>> listOfFiles) {
         LocalDateTime now = LocalDateTime.now();
         String date = now.getHour() + "_" + now.getMinute() + "_" + now.getNano();
 
@@ -125,7 +125,7 @@ public class DataShipperService {
         }
     }
 
-    private void clearBatchData(HashMap<Integer, HashMap<Integer, ArrayList<SimpleEdge>>> batchDataToBeShipped) {
+    private void clearBatchData(Map<Integer, Map<Integer, List<SimpleEdge>>> batchDataToBeShipped) {
         for (int i : batchDataToBeShipped.keySet()) {
             for (int j : batchDataToBeShipped.get(i).keySet()) {
                 batchDataToBeShipped.get(i).get(j).clear();
@@ -133,7 +133,7 @@ public class DataShipperService {
         }
     }
 
-    public void edgeShipper(HashMap<Integer, ArrayList<String>> listOfFiles) {
+    public void edgeShipper(Map<Integer, List<String>> listOfFiles) {
         logger.info("*DATA SHIPPER*: Edges are received to be shipped to the workers");
         StringBuilder message;
         activeMQService.connectProducer();
@@ -245,8 +245,8 @@ public class DataShipperService {
         return singlePatternTreeNodesList;
     }
 
-    public HashMap<Integer, ArrayList<SimpleEdge>> readEdgesToBeShipped(String msg) {
-        HashMap<Integer, ArrayList<SimpleEdge>> dataToBeShipped = new HashMap<>();
+    public Map<Integer, List<SimpleEdge>> readEdgesToBeShipped(String msg) {
+        Map<Integer, List<SimpleEdge>> dataToBeShipped = new HashMap<>();
         String[] filePaths = msg.split("\n");
 
         for (int i = 1; i < filePaths.length; i++) {

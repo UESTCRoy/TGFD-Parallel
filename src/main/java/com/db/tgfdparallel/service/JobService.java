@@ -45,7 +45,7 @@ public class JobService {
                     .filter(v -> v.getTypes().contains(centerNodeType))
                     .forEach(v -> {
                         int currentJobID = jobID.incrementAndGet();
-                        ArrayList<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
+                        List<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
                         Job job = new Job(currentJobID, diameter, v, fragmentsForTheInitialLoad.get(v.getUri()), edges, ptn);
                         jobsByFragmentID.get(fragmentsForTheInitialLoad.get(v.getUri())).add(job);
                         if (currentJobID % 100 == 0) {

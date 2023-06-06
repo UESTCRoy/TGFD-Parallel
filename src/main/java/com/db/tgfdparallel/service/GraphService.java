@@ -308,8 +308,8 @@ public class GraphService {
         }
     }
 
-    public ArrayList<RelationshipEdge> getEdgesWithinDiameter(Graph<Vertex, RelationshipEdge> graph, Vertex center, int diameter) {
-        ArrayList<RelationshipEdge> edges = new ArrayList<>();
+    public List<RelationshipEdge> getEdgesWithinDiameter(Graph<Vertex, RelationshipEdge> graph, Vertex center, int diameter) {
+        List<RelationshipEdge> edges = new ArrayList<>();
         // Define a Map to store visited vertices
         Map<String, Integer> visited = new HashMap<>();
         // Create a queue for BFS
@@ -359,7 +359,7 @@ public class GraphService {
 
         List<Vertex> withinDiameter = new ArrayList<>();
         // Define a HashMap to store visited vertices
-        HashMap<String, Integer> visited = new HashMap<>();
+        Map<String, Integer> visited = new HashMap<>();
 
         // Create a queue for BFS
         LinkedList<Vertex> queue = new LinkedList<>();
@@ -415,7 +415,7 @@ public class GraphService {
         }
     }
 
-    public Graph<Vertex, RelationshipEdge> extractGraphToBeSent(GraphLoader graphLoader, ArrayList<SimpleEdge> edges) {
+    public Graph<Vertex, RelationshipEdge> extractGraphToBeSent(GraphLoader graphLoader, List<SimpleEdge> edges) {
         Graph<Vertex, RelationshipEdge> graphToBeSent = new DefaultDirectedGraph<>(RelationshipEdge.class);
         HashSet<String> visited = new HashSet<>();
 
@@ -500,7 +500,7 @@ public class GraphService {
 
     public void updateFirstSnapshot(GraphLoader graphLoader) {
         boolean datashipper = false;
-        HashMap<Integer, ArrayList<SimpleEdge>> dataToBeShipped = new HashMap<>();
+        Map<Integer, List<SimpleEdge>> dataToBeShipped = new HashMap<>();
         VF2DataGraph graph = graphLoader.getGraph();
 
         try {

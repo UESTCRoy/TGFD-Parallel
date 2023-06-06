@@ -3,7 +3,7 @@ package com.db.tgfdparallel.domain;
 import lombok.Data;
 import org.jgrapht.Graph;
 
-import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class Job {
@@ -11,11 +11,11 @@ public class Job {
     private int diameter;
     private Vertex centerNode;
     private int fragmentID;
-    private ArrayList<RelationshipEdge> edges;
+    private List<RelationshipEdge> edges;
     private Graph<Vertex, RelationshipEdge> subgraph;
     private PatternTreeNode patternTreeNode;
 
-    public Job(int ID, int diameter, Vertex centerNode, int fragmentID, ArrayList<RelationshipEdge> edges, PatternTreeNode patternTreeNode) {
+    public Job(int ID, int diameter, Vertex centerNode, int fragmentID, List<RelationshipEdge> edges, PatternTreeNode patternTreeNode) {
         this.ID = ID;
         this.diameter = diameter;
         this.centerNode = centerNode;
