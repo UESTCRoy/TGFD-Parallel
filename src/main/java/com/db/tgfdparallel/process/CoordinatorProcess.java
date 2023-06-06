@@ -73,7 +73,7 @@ public class CoordinatorProcess {
         jobService.jobAssigner(jobsByFragmentID);
 
         // Send the edge data to the workers
-        HashMap<Integer, ArrayList<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, jobsByFragmentID, fragmentsForTheInitialLoad);
+        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, jobsByFragmentID, fragmentsForTheInitialLoad);
         dataShipperService.edgeShipper(listOfFiles);
 
         // Send the changes to the workers
