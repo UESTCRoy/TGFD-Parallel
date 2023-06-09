@@ -79,10 +79,13 @@ public class PatternService {
                                                 Map<Integer, List<Job>> assignedJobsBySnapshot) {
         // TODO: how should we set the diameter?
         int diameter = 2;
+        Set<String> singlePatternTypes = singlePatternTreeNodesMap.keySet();
+        assignedJobsBySnapshot.put(snapshotID, new ArrayList<>());
 
         for (PatternTreeNode ptn : singlePatternTreeNodesMap.values()) {
             for (Vertex vertex : graph.vertexSet()) {
-                if (singlePatternTreeNodesMap.containsKey(vertex.getTypes())) {
+                // 判断singleNodePattern与vertex的types是否有交集
+                if (!Collections.disjoint(singlePatternTypes, vertex.getTypes())) {
                     Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, vertex, diameter);
 
                     Set<Set<ConstantLiteral>> matches = new HashSet<>();

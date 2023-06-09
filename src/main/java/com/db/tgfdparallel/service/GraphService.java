@@ -504,6 +504,7 @@ public class GraphService {
         VF2DataGraph graph = graphLoader.getGraph();
 
         try {
+            activeMQService.connectConsumer(config.getNodeName());
             while (!datashipper) {
                 String msg = activeMQService.receive();
                 if (msg.startsWith("#datashipper")) {
@@ -512,6 +513,7 @@ public class GraphService {
                     datashipper = true;
                 }
             }
+            activeMQService.closeConsumer();
 
             dataToBeShipped.forEach((workerID, edges) -> {
                 try {
@@ -525,7 +527,7 @@ public class GraphService {
             int receiveData = 0;
             activeMQService.connectConsumer(config.getNodeName() + "_data");
 
-            while (receiveData < dataToBeShipped.size() - 1) {
+            while (receiveData < dataToBeShipped.size()) {
                 logger.info("*WORKER*: Start reading data from other workers...");
                 String msg = activeMQService.receive();
                 logger.info("*WORKER*: Received a new message.");
@@ -543,8 +545,8 @@ public class GraphService {
                 }
                 receiveData++;
             }
-
-            activeMQService.sendResult(1);
+            activeMQService.closeConsumer();
+//            activeMQService.sendResult(1);
         } catch (Exception e) {
             logger.error("Error while running first snapshot", e);
         }

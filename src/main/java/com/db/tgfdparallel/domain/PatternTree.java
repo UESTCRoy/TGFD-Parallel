@@ -12,5 +12,6 @@ public class PatternTree {
 
     public PatternTree() {
         this.tree = new ArrayList<>();
+        this.tree.add(new ArrayList<>());
     }
 }

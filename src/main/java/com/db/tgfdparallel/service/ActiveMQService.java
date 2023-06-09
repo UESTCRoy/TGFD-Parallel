@@ -6,7 +6,6 @@ import com.db.tgfdparallel.domain.Producer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -30,10 +29,9 @@ public class ActiveMQService {
         this.producer = producer;
         this.workersStatusChecker = new AtomicBoolean(true);
         this.workersStatus = new ConcurrentHashMap<>();
-        initializeWorkersStatus();
     }
 
-    private void initializeWorkersStatus() {
+    public void initializeWorkersStatus() {
         for (String worker : config.getWorkers()) {
             workersStatus.put(worker, false);
         }
@@ -68,12 +66,11 @@ public class ActiveMQService {
         connectProducer();
         for (String worker : config.getWorkers()) {
             send(worker, message);
-            logger.info("Message sent to worker: " + worker + "Successfully!");
+            logger.info("Message sent to worker: " + worker + " Successfully!");
         }
         closeProducer();
     }
 
-    @Async
     public void statusCheck() {
         consumer.connect("status");
 

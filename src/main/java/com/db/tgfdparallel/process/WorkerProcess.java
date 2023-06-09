@@ -3,6 +3,7 @@ package com.db.tgfdparallel.process;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
+import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.jgrapht.Graph;
 import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
@@ -43,12 +44,12 @@ public class WorkerProcess {
         logger.info("{} send the status to Coordinator at {}", config.getNodeName(), LocalDateTime.now());
         activeMQService.sendStatus();
 
-        // Receive the pattern tree from the coordinator
-        List<PatternTreeNode> patternTreeNodes = dataShipperService.receiveSinglePatternNode();
-
         // Receive the histogram data from the coordinator
         ProcessedHistogramData histogramData = dataShipperService.receiveHistogramData();
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
+
+        // Receive the pattern tree from the coordinator
+        List<PatternTreeNode> patternTreeNodes = dataShipperService.receiveSinglePatternNode();
 
         // Load the first snapshot
         GraphLoader graphLoader = graphService.loadFirstSnapshot(config.getDataPath());
@@ -63,7 +64,9 @@ public class WorkerProcess {
 
         List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
         for (int i = 0; i < changesData.size(); i++) {
-            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), graphLoader);
+            // I create a deep copy of firstLoader here
+            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(graphLoader);
+            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), copyOfFirstLoader);
             loaders[i + 1] = changeLoader;
         }
 
@@ -80,7 +83,7 @@ public class WorkerProcess {
                         node -> node
                 ));
         for (int i = 0; i < config.getTimestamp(); i++) {
-            patternService.singleNodePatternInitialization(loaders[i].getGraph().getGraph(), i + 1, vertexTypesToActiveAttributesMap,
+            patternService.singleNodePatternInitialization(loaders[i].getGraph().getGraph(), i, vertexTypesToActiveAttributesMap,
                     patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
         }
 
@@ -127,7 +130,7 @@ public class WorkerProcess {
                     newJobsList.put(index, newJobsAtIndex);
                 }
 
-                for (int superstep = 0; superstep <= config.getTimestamp(); superstep++) {
+                for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, entityURIsByPTN, vertexTypesToActiveAttributesMap);
                 }
@@ -171,13 +174,13 @@ public class WorkerProcess {
             List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                             Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
 
-        System.out.println("Retrieving matches for all the joblets.");
+        logger.info("Retrieving matches for all the joblets.");
 
         long startTime = System.currentTimeMillis();
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
 
-        for (int index = 0; index <= snapShotID; index++) {
+        for (int index = 0; index < snapShotID; index++) {
             for (Job job : newJobsList.get(index)) {
                 if (!verticesInGraph.contains(job.getCenterNode())) {
                     continue;
@@ -196,8 +199,6 @@ public class WorkerProcess {
                 }
             }
         }
-
     }
-
 
 }
