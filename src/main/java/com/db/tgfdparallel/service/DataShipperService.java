@@ -139,11 +139,11 @@ public class DataShipperService {
         activeMQService.connectProducer();
         for (int id : listOfFiles.keySet()) {
             message = new StringBuilder();
-            message.append(id).append("\n");
+            message.append("#datashipper").append("\n");
             for (String fileName : listOfFiles.get(id)) {
                 message.append(fileName).append("\n");
             }
-            activeMQService.send(config.getWorkers().get(id), message.toString());
+            activeMQService.send(config.getWorkers().get(id - 1), message.toString());
         }
     }
 
@@ -189,6 +189,7 @@ public class DataShipperService {
         ProcessedHistogramData data = null;
         while (!histogramStatsReceived) {
             try {
+                activeMQService.connectConsumer(config.getNodeName());
                 String msg = activeMQService.receive();
                 if (msg != null && msg.startsWith("#histogramData")) {
                     histogramStatsReceived = true;
@@ -196,8 +197,15 @@ public class DataShipperService {
                             (ProcessedHistogramData) s3Service.downloadObject(config.getBucketName(), "processedHistogramData") :
                             (ProcessedHistogramData) hdfsService.downloadObject(config.getHDFSPath(), "processedHistogramData");
                 }
+                activeMQService.closeConsumer();
             } catch (Exception e) {
                 logger.error("Error while receiving histogram data: {}", e.getMessage());
+                // No message received, sleep for a while
+                try {
+                    Thread.sleep(5000); // Sleep for 5 second
+                } catch (InterruptedException ie) {
+                    // Ignore the interruption and continue the loop
+                }
             }
         }
         return data;
@@ -220,6 +228,7 @@ public class DataShipperService {
 
         while (!singlePatternTreeNodesReceived) {
             try {
+                activeMQService.connectConsumer(config.getNodeName());
                 String msg = activeMQService.receive();
                 if (msg != null && msg.startsWith("#singlePattern")) {
                     String fileName = msg.split("\t")[1];
@@ -236,10 +245,17 @@ public class DataShipperService {
                     logger.info("All single PatternTreeNodes have been received.");
                     singlePatternTreeNodesReceived = true;
                 }
+                activeMQService.closeConsumer();
             } catch (IOException e) {
                 logger.error("An IOException occurred while receiving single PatternTreeNodes.", e);
             } catch (Exception e) {
                 logger.error("An exception occurred while receiving single PatternTreeNodes.", e);
+                // An error occurred, sleep for a while
+                try {
+                    Thread.sleep(5000); // Sleep for 5 second
+                } catch (InterruptedException ie) {
+                    // Ignore the interruption and continue the loop
+                }
             }
         }
         return singlePatternTreeNodesList;
@@ -309,11 +325,25 @@ public class DataShipperService {
             hdfsService.uploadObject(config.getBucketName(), key, constantTGFDMap);
         }
 
-        logger.info("Worker " + config.getNodeName() + "finish!");
         activeMQService.connectProducer();
-        activeMQService.send("constant-tgfd", config.getNodeName());
+        activeMQService.send("constant-tgfd", key);
         logger.info("Worker " + config.getNodeName() + "send constant tgfds back to coordinator successfully!");
         activeMQService.closeProducer();
+    }
+
+    // TODO: 运用像是worker status的功能
+    public Map<Integer, Set<TGFD>> downloadConstantTGFD() {
+        Map<Integer, Set<TGFD>> obj = null;
+        try {
+            activeMQService.connectConsumer("constant-tgfd");
+            String msg = activeMQService.receive();
+            obj = (Map<Integer, Set<TGFD>>) downloadObject(msg);
+        } catch (IOException e) {
+            logger.error("Error while downloading constant TGFD: " + e.getMessage(), e);
+        } catch (ClassCastException e) {
+            logger.error("Error while casting downloaded object to Map<Integer, Set<TGFD>>: " + e.getMessage(), e);
+        }
+        return obj;
     }
 
     public List<List<Change>> receiveChangesFromCoordinator() {
@@ -322,6 +352,7 @@ public class DataShipperService {
 
         while (!changeReceived) {
             try {
+                activeMQService.connectConsumer(config.getNodeName());
                 String msg = activeMQService.receive();
                 if (msg != null && msg.startsWith("#change")) {
                     String[] lines = msg.split("\n");
@@ -336,8 +367,15 @@ public class DataShipperService {
                     }
                     changeReceived = true;
                 }
+                activeMQService.closeConsumer();
             } catch (Exception e) {
                 logger.error("Error while receiving changes", e);
+                // An error occurred, sleep for a while
+                try {
+                    Thread.sleep(5000); // Sleep for 5 second
+                } catch (InterruptedException ie) {
+                    // Ignore the interruption and continue the loop
+                }
             }
         }
         return changesData;

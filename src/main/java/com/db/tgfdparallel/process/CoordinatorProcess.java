@@ -8,8 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +38,7 @@ public class CoordinatorProcess {
 
     public void start() {
         logger.info("Check the status of the workers");
+        activeMQService.initializeWorkersStatus();
         activeMQService.statusCheck();
 
         // Generate all the changes for histogram computation and send to all workers
@@ -49,8 +48,8 @@ public class CoordinatorProcess {
         // Generate histogram and send the histogram data to all workers
         String dataPath = config.getDataPath();
         logger.info("Load the first snapshot from the data path: {}", dataPath);
-        // TODO: create a deep copy of firstLoader here.
         GraphLoader firstLoader = graphService.loadFirstSnapshot(dataPath);
+        // I use deep copy: kryo here
         ProcessedHistogramData histogramData = histogramService.computeHistogram(firstLoader.getGraph(), changesData);
         logger.info("Send the histogram data to the worker");
         dataShipperService.sendHistogramData(histogramData);
@@ -69,8 +68,8 @@ public class CoordinatorProcess {
         Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(config.getSplitGraphPath());
 
         // Define jobs and assign them to the workers
-        Map<Integer, List<Job>> jobsByFragmentID = jobService.defineJobs(firstLoader, fragmentsForTheInitialLoad, patternTreeNodes);
-        jobService.jobAssigner(jobsByFragmentID);
+        Map<Integer, List<Job>> jobsByFragmentID = jobService.defineJobs(firstLoader.getGraph().getGraph(), fragmentsForTheInitialLoad, patternTreeNodes);
+//        jobService.jobAssigner(jobsByFragmentID);
 
         // Send the edge data to the workers
         Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, jobsByFragmentID, fragmentsForTheInitialLoad);
@@ -88,8 +87,30 @@ public class CoordinatorProcess {
             logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
-        //TODO: 接收来自workers的constant TGFDs，然后处理
-
+        //TODO: 接收来自workers的constant TGFDs，然后处理, 这里可能得用list而不是set
+//        Map<Integer, Set<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD();
+//        for (Map.Entry<Integer, Set<TGFD>> entry : integerSetMap.entrySet()) {
+//            Set<TGFD> constantTGFDSets = entry.getValue();
+//            Integer hashKey = entry.getKey();
+//            // Negative
+//            if (constantTGFDSets.size() > 1) {
+//                int passCount = 0;
+//                double maxSupport = 0;
+//                for (TGFD data : constantTGFDSets) {
+//                    if (data.getTgfdSupport() >= config.getTgfdTheta()) {
+//                        passCount++;
+//                    }
+//                    maxSupport = Math.max(data.getTgfdSupport(), maxSupport);
+//                }
+//                if (maxSupport < config.getTgfdTheta()) {
+//                    integerSetMap.remove(hashKey);
+//                } else if (passCount > 1) {
+//                    // convert into general TGFD
+//                } else {
+//                    // only one TGFD pass the support
+//                }
+//            }
+//        }
     }
 
 //    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {

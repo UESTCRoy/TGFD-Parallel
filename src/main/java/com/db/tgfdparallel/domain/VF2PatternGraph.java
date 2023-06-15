@@ -4,9 +4,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.jgrapht.Graph;
 
+import java.io.Serializable;
+
 @Data
 @NoArgsConstructor
-public class VF2PatternGraph {
+public class VF2PatternGraph implements Serializable {
     private Graph<Vertex, RelationshipEdge> pattern;
     private int diameter;
     private String centerVertexType;

@@ -30,18 +30,17 @@ public class JobService {
         this.activeMQService = activeMQService;
     }
 
-    public Map<Integer, List<Job>> defineJobs(GraphLoader firstLoader, Map<String, Integer> fragmentsForTheInitialLoad, List<PatternTreeNode> singlePatternTreeNodes) {
+    public Map<Integer, List<Job>> defineJobs(Graph<Vertex, RelationshipEdge> graph, Map<String, Integer> fragmentsForTheInitialLoad, List<PatternTreeNode> singlePatternTreeNodes) {
         Map<Integer, List<Job>> jobsByFragmentID = new HashMap<>();
         AtomicInteger jobID = new AtomicInteger(0);
         int diameter = 2;
-        Graph<Vertex, RelationshipEdge> graph = firstLoader.getGraph().getGraph();
         IntStream.rangeClosed(1, config.getWorkers().size())
                 .forEach(i -> jobsByFragmentID.put(i, new ArrayList<>()));
 
         // TODO: The fragmentID of the job may not be useful ant all!
         for (PatternTreeNode ptn : singlePatternTreeNodes) {
             String centerNodeType = ptn.getPattern().getCenterVertexType();
-            firstLoader.getGraph().getGraph().vertexSet().stream()
+            graph.vertexSet().stream()
                     .filter(v -> v.getTypes().contains(centerNodeType))
                     .forEach(v -> {
                         int currentJobID = jobID.incrementAndGet();
@@ -83,6 +82,24 @@ public class JobService {
 
         activeMQService.closeProducer();
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
+    }
+
+    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, List<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+        Map<Integer, List<Job>> newJobsList = new HashMap<>();
+        for (int index : assignedJobsBySnapshot.keySet()) {
+            List<Job> newJobsAtIndex = new ArrayList<>();
+            List<Job> additionalJobs = new ArrayList<>();
+            for (Job job : assignedJobsBySnapshot.get(index)) {
+                if (job.getPatternTreeNode().getPattern().equals(pattern)) {
+                    Job newJob = new Job(job.getCenterNode(), newPattern);
+                    newJobsAtIndex.add(newJob);
+                    additionalJobs.add(newJob);
+                }
+            }
+            assignedJobsBySnapshot.get(index).addAll(additionalJobs);
+            newJobsList.put(index, newJobsAtIndex);
+        }
+        return newJobsList;
     }
 
 }

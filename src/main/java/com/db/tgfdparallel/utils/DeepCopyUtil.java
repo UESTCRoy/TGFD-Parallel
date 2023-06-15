@@ -1,9 +1,6 @@
 package com.db.tgfdparallel.utils;
 
-import com.db.tgfdparallel.domain.Attribute;
-import com.db.tgfdparallel.domain.RelationshipEdge;
-import com.db.tgfdparallel.domain.VF2DataGraph;
-import com.db.tgfdparallel.domain.Vertex;
+import com.db.tgfdparallel.domain.*;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
@@ -20,6 +17,8 @@ public class DeepCopyUtil {
         kryo.register(java.util.HashSet.class);
         kryo.register(java.util.HashMap.class);
         kryo.register(Attribute.class);
+        kryo.register(GraphLoader.class);
+        kryo.register(VF2PatternGraph.class);
     }
 
     public static <T> T deepCopy(T original) {

@@ -5,16 +5,18 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Vertex {
+public class Vertex implements Serializable {
     @EqualsAndHashCode.Include
     private String uri;
-//    @EqualsAndHashCode.Include
+    //    @EqualsAndHashCode.Include
     private Set<String> types;
     private Set<Attribute> attributes;
     private boolean isMarked;
@@ -34,38 +36,57 @@ public class Vertex {
     }
 
     public Vertex(String type) {
+        this.uri = type;
         this.types = new HashSet<>();
         this.types.add(type);
+        this.attributes = new HashSet<>();
     }
 
-    // TODO: Can we just compare VertexURI?
     public boolean isMapped(Vertex other) {
         if (other == null) {
             return false;
         }
 
-        if (!this.uri.equals(other.uri) || !this.types.equals(other.types)) {
+        if (!this.getTypes().containsAll(other.getTypes()) && !other.getTypes().iterator().next().equals("_")) {
             return false;
         }
 
-        if (this.attributes.size() != other.attributes.size()) {
-            return false;
-        }
-
-        for (Attribute attr : this.attributes) {
-            boolean found = false;
-            for (Attribute otherAttr : other.attributes) {
-                if (attr.getAttrName().equals(otherAttr.getAttrName()) && attr.getAttrValue().equals(otherAttr.getAttrValue())) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
+        if (!other.getAttributes().isEmpty()) {
+            if (!Objects.equals(other.getAttributes(), this.getAttributes())) {
                 return false;
             }
         }
 
         return true;
     }
+
+//    public boolean isMapped(Vertex other) {
+//        if (other == null) {
+//            return false;
+//        }
+//
+//        if (!this.uri.equals(other.uri) || !this.types.equals(other.types)) {
+//            return false;
+//        }
+//
+//        if (this.attributes.size() != other.attributes.size()) {
+//            return false;
+//        }
+//
+//        for (Attribute attr : this.attributes) {
+//            boolean found = false;
+//            for (Attribute otherAttr : other.attributes) {
+//                if (attr.getAttrName().equals(otherAttr.getAttrName()) && attr.getAttrValue().equals(otherAttr.getAttrValue())) {
+//                    found = true;
+//                    break;
+//                }
+//            }
+//            if (!found) {
+//                return false;
+//            }
+//        }
+//
+//        return true;
+//    }
 
 }
