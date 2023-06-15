@@ -87,8 +87,30 @@ public class CoordinatorProcess {
             logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
-        //TODO: 接收来自workers的constant TGFDs，然后处理
-
+        //TODO: 接收来自workers的constant TGFDs，然后处理, 这里可能得用list而不是set
+//        Map<Integer, Set<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD();
+//        for (Map.Entry<Integer, Set<TGFD>> entry : integerSetMap.entrySet()) {
+//            Set<TGFD> constantTGFDSets = entry.getValue();
+//            Integer hashKey = entry.getKey();
+//            // Negative
+//            if (constantTGFDSets.size() > 1) {
+//                int passCount = 0;
+//                double maxSupport = 0;
+//                for (TGFD data : constantTGFDSets) {
+//                    if (data.getTgfdSupport() >= config.getTgfdTheta()) {
+//                        passCount++;
+//                    }
+//                    maxSupport = Math.max(data.getTgfdSupport(), maxSupport);
+//                }
+//                if (maxSupport < config.getTgfdTheta()) {
+//                    integerSetMap.remove(hashKey);
+//                } else if (passCount > 1) {
+//                    // convert into general TGFD
+//                } else {
+//                    // only one TGFD pass the support
+//                }
+//            }
+//        }
     }
 
 //    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {

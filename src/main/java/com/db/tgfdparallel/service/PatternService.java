@@ -2,6 +2,7 @@ package com.db.tgfdparallel.service;
 
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
+import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphMapping;
@@ -79,30 +80,32 @@ public class PatternService {
                                                 Map<Integer, List<Job>> assignedJobsBySnapshot) {
         // TODO: how should we set the diameter?
         int diameter = 2;
-        Set<String> singlePatternTypes = singlePatternTreeNodesMap.keySet();
         assignedJobsBySnapshot.put(snapshotID, new ArrayList<>());
 
-        for (PatternTreeNode ptn : singlePatternTreeNodesMap.values()) {
-            for (Vertex vertex : graph.vertexSet()) {
-                // 判断singleNodePattern与vertex的types是否有交集
-                if (!Collections.disjoint(singlePatternTypes, vertex.getTypes())) {
-                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, vertex, diameter);
+        for (Map.Entry<String, PatternTreeNode> entry : singlePatternTreeNodesMap.entrySet()) {
+            String ptnType = entry.getKey();
+            PatternTreeNode ptn = entry.getValue();
+            Set<String> validTypes = new HashSet<>();
+            validTypes.add(ptnType);
+            // TODO: 我们在这里试图找出subgraph的同构，是否只过滤vertex types与ptn types完全一样
+            graph.vertexSet().stream()
+                    .filter(vertex -> vertex.getTypes().contains(ptnType))
+                    .forEach(vertex -> {
+                        Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, vertex, diameter, validTypes);
 
-                    Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                    VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, ptn.getPattern(), false);
+                        Set<Set<ConstantLiteral>> matches = new HashSet<>();
+                        VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, ptn.getPattern(), false);
 
-                    int numOfMatchesInTimestamp = 0;
-                    if (results.isomorphismExists()) {
-                        numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
-                    }
-
-                    Job job = new Job(vertex, ptn);
-                    job.setSubgraph(subgraph);
-                    assignedJobsBySnapshot.get(snapshotID).add(job);
-
-                    matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
-                }
-            }
+                        int numOfMatchesInTimestamp = 0;
+                        if (results.isomorphismExists()) {
+                            numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
+                        }
+                        // TODO: 找不到matches也要定义Job吗？
+                        Job job = new Job(vertex, ptn);
+                        job.setSubgraph(subgraph);
+                        assignedJobsBySnapshot.get(snapshotID).add(job);
+                        matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
+                    });
         }
     }
 
@@ -199,7 +202,7 @@ public class PatternService {
             int numberOfMatchesFound = matchesPerTimestampsByPTN.get(ptn).stream()
                     .mapToInt(Set::size)
                     .sum();
-            System.out.println("Total number of matches found across all snapshots:" + numberOfMatchesFound);
+            logger.info("Total number of matches found across all snapshots:" + numberOfMatchesFound);
 
             double S = vertexHistogram.get(ptn.getPattern().getCenterVertexType());
             double patternSupport = calculatePatternSupport(entityURIsByPTN.get(ptn), S, config.getTimestamp());
@@ -234,8 +237,11 @@ public class PatternService {
 
         // TODO: Set pattern Pruned?
         for (PatternTreeNode ptn : nodes) {
+            if (ptn.isPruned()) {
+                continue;
+            }
             for (String edge : edgeData) {
-                VSpawnPattern pattern = null;
+                VSpawnPattern pattern = new VSpawnPattern();
                 // TODO: if ptn is pruned, we skip it.
                 String sourceVertexType = edge.split(" ")[0];
                 String targetVertexType = edge.split(" ")[2];
@@ -246,7 +252,7 @@ public class PatternService {
                     continue;
                 }
 
-                if (vertexTypesToActiveAttributesMap.get(targetVertexType).size() == 0) {
+                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType)) {
                     logger.info("Target vertex type has no active attributes. Skipping edge: " + edge);
                     continue;
                 }
@@ -275,14 +281,16 @@ public class PatternService {
                         continue;
                     }
 
-                    if (!sourceVertexType.equals(v.getTypes()) && !targetVertexType.equals(v.getTypes())) {
+                    if (!v.getTypes().contains(sourceVertexType) && !v.getTypes().contains(targetVertexType)) {
                         logger.info("Vertex is not source or target. Skipping edge: " + edge);
+                        v.setMarked(true);
                         continue;
                     }
 
                     pattern.setOldPattern(ptn);
-                    Graph<Vertex, RelationshipEdge> graph = ptn.getPattern().getPattern();
-                    VF2PatternGraph newPattern = copyGraph(graph);
+//                    VF2PatternGraph newPattern = copyGraph(graph);
+                    VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(ptn.getPattern());
+                    Graph<Vertex, RelationshipEdge> graph = newPattern.getPattern();
                     if (targetVertex == null) {
                         targetVertex = new Vertex(targetVertexType);
                         addVertex(newPattern, targetVertex);
@@ -319,9 +327,7 @@ public class PatternService {
 //                        continue;
 //                    }
 
-                    // TODO: Mark这里的用处
-
-                    PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes);
+                    PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes, level);
                     pattern.setNewPattern(patternTreeNode);
                     vSpawnPatternList.add(pattern);
                 }
@@ -386,15 +392,34 @@ public class PatternService {
         graph.addEdge(v1, v2, edge);
     }
 
-    public PatternTreeNode initializeNewNode(VF2PatternGraph pattern, PatternTreeNode parentNode, String candidateEdgeString, List<PatternTreeNode> nodes) {
+    public PatternTreeNode initializeNewNode(VF2PatternGraph pattern, PatternTreeNode parentNode, String candidateEdgeString, List<PatternTreeNode> nodes, int level) {
         PatternTreeNode node = new PatternTreeNode(pattern, parentNode, candidateEdgeString);
-        findSubgraphParents(node, nodes);
+        if (level == 0) {
+            findFirstLevelSubgraphParents(node, nodes);
+        } else {
+            findSubgraphParents(node, nodes);
+        }
         findCenterVertexParent(node, nodes);
         return node;
     }
 
+    public void findFirstLevelSubgraphParents(PatternTreeNode node, List<PatternTreeNode> nodes) {
+        List<String> newPatternVertices = node.getPattern().getPattern().vertexSet().stream()
+                .map(vertex -> vertex.getTypes().iterator().next())
+                .collect(Collectors.toList());
+
+        for (PatternTreeNode otherPatternNode : nodes) {
+            String otherType = otherPatternNode.getPattern().getPattern().vertexSet().iterator().next().getTypes().iterator().next();
+
+            Set<String> otherTypes = new HashSet<>(Collections.singleton(otherType));
+
+            if (newPatternVertices.containsAll(otherTypes)) {
+                node.getSubgraphParents().add(otherPatternNode);
+            }
+        }
+    }
+
     public void findSubgraphParents(PatternTreeNode node, List<PatternTreeNode> nodes) {
-        // TODO: 有没有必要给level0 赋subgraph?
         List<String> newPatternEdges = node.getPattern().getPattern().edgeSet().stream()
                 .map(RelationshipEdge::toString)
                 .collect(Collectors.toList());

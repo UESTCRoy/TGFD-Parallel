@@ -123,5 +123,15 @@ public class ActiveMQService {
         logger.info("*WORKER*: SupersStep "+superStepNumber+" is done successfully");
         closeProducer();
     }
+
+//    public String receiveConstantTGFDMsg() {
+//        StringBuilder sb = new StringBuilder();
+//        workersStatusChecker.set(true);
+//        consumer.connect("");
+//
+//        while (workersStatusChecker.get()) {
+//
+//        }
+//    }
 }
 

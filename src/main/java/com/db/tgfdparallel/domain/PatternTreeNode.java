@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -15,12 +16,13 @@ public class PatternTreeNode implements Serializable {
     private List<PatternTreeNode> subgraphParents;
     private PatternTreeNode centerVertexParent;
     private String edgeString;
-//    private boolean isPruned;
+    private boolean isPruned;
 
     public PatternTreeNode(VF2PatternGraph pattern, PatternTreeNode parentNode, String edgeString) {
         this.pattern = pattern;
         this.parentNode = parentNode;
         this.edgeString = edgeString;
+        this.subgraphParents = new ArrayList<>();
     }
 
 }

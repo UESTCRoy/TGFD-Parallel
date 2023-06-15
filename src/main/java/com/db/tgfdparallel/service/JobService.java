@@ -84,4 +84,22 @@ public class JobService {
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
     }
 
+    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, List<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+        Map<Integer, List<Job>> newJobsList = new HashMap<>();
+        for (int index : assignedJobsBySnapshot.keySet()) {
+            List<Job> newJobsAtIndex = new ArrayList<>();
+            List<Job> additionalJobs = new ArrayList<>();
+            for (Job job : assignedJobsBySnapshot.get(index)) {
+                if (job.getPatternTreeNode().getPattern().equals(pattern)) {
+                    Job newJob = new Job(job.getCenterNode(), newPattern);
+                    newJobsAtIndex.add(newJob);
+                    additionalJobs.add(newJob);
+                }
+            }
+            assignedJobsBySnapshot.get(index).addAll(additionalJobs);
+            newJobsList.put(index, newJobsAtIndex);
+        }
+        return newJobsList;
+    }
+
 }

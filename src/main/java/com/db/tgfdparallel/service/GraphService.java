@@ -354,7 +354,7 @@ public class GraphService {
         }
     }
 
-    public Graph<Vertex, RelationshipEdge> getSubGraphWithinDiameter(Graph<Vertex, RelationshipEdge> graph, Vertex center, int diameter) {
+    public Graph<Vertex, RelationshipEdge> getSubGraphWithinDiameter(Graph<Vertex, RelationshipEdge> graph, Vertex center, int diameter, Set<String> validTypes) {
         Graph<Vertex, RelationshipEdge> subgraph = new DefaultDirectedGraph<>(RelationshipEdge.class);
 
         List<Vertex> withinDiameter = new ArrayList<>();
@@ -384,7 +384,7 @@ public class GraphService {
                 w = getConnectedVertex(v, edge);
                 // Check if the vertex is not visited
                 // Check if the vertex is within the diameter
-                if (distance + 1 <= diameter && !visited.containsKey(w.getUri()) && graph.containsVertex(w)) {
+                if (distance + 1 <= diameter && isValidType(validTypes,w.getTypes()) && !visited.containsKey(w.getUri()) && graph.containsVertex(w)) {
                     // Enqueue the vertex and add it to the visited set
                     visited.put(w.getUri(), distance + 1);
                     queue.add(w);
@@ -560,5 +560,10 @@ public class GraphService {
             logger.error("Error while updating graph and sending results" , e);
         }
         return baseLoader;
+    }
+
+    private boolean isValidType(Set<String> validTypes, Set<String> givenTypes)
+    {
+        return givenTypes.stream().anyMatch(validTypes::contains);
     }
 }

@@ -325,11 +325,25 @@ public class DataShipperService {
             hdfsService.uploadObject(config.getBucketName(), key, constantTGFDMap);
         }
 
-        logger.info("Worker " + config.getNodeName() + "finish!");
         activeMQService.connectProducer();
-        activeMQService.send("constant-tgfd", config.getNodeName());
+        activeMQService.send("constant-tgfd", key);
         logger.info("Worker " + config.getNodeName() + "send constant tgfds back to coordinator successfully!");
         activeMQService.closeProducer();
+    }
+
+    // TODO: 运用像是worker status的功能
+    public Map<Integer, Set<TGFD>> downloadConstantTGFD() {
+        Map<Integer, Set<TGFD>> obj = null;
+        try {
+            activeMQService.connectConsumer("constant-tgfd");
+            String msg = activeMQService.receive();
+            obj = (Map<Integer, Set<TGFD>>) downloadObject(msg);
+        } catch (IOException e) {
+            logger.error("Error while downloading constant TGFD: " + e.getMessage(), e);
+        } catch (ClassCastException e) {
+            logger.error("Error while casting downloaded object to Map<Integer, Set<TGFD>>: " + e.getMessage(), e);
+        }
+        return obj;
     }
 
     public List<List<Change>> receiveChangesFromCoordinator() {

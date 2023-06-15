@@ -18,6 +18,7 @@ public class DeepCopyUtil {
         kryo.register(java.util.HashMap.class);
         kryo.register(Attribute.class);
         kryo.register(GraphLoader.class);
+        kryo.register(VF2PatternGraph.class);
     }
 
     public static <T> T deepCopy(T original) {

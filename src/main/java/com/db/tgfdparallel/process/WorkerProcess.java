@@ -26,10 +26,11 @@ public class WorkerProcess {
     private final PatternService patternService;
     private final HSpawnService hSpawnService;
     private final TGFDService tgfdService;
+    private final JobService jobService;
 
     @Autowired
     public WorkerProcess(AppConfig config, ActiveMQService activeMQService, DataShipperService dataShipperService, GraphService graphService,
-                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService) {
+                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, JobService jobService) {
         this.config = config;
         this.activeMQService = activeMQService;
         this.dataShipperService = dataShipperService;
@@ -37,6 +38,7 @@ public class WorkerProcess {
         this.patternService = patternService;
         this.hSpawnService = hSpawnService;
         this.tgfdService = tgfdService;
+        this.jobService = jobService;
     }
 
     public void start() {
@@ -45,8 +47,11 @@ public class WorkerProcess {
         activeMQService.sendStatus();
 
         // Receive the histogram data from the coordinator
+        // TODO: histogram字段并不全部有用
         ProcessedHistogramData histogramData = dataShipperService.receiveHistogramData();
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
+        List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram().stream().map(FrequencyStatistics::getType).collect(Collectors.toList());
+        Map<String, Integer> vertexHistogram = histogramData.getVertexHistogram();
 
         // Receive the pattern tree from the coordinator
         List<PatternTreeNode> patternTreeNodes = dataShipperService.receiveSinglePatternNode();
@@ -95,7 +100,6 @@ public class WorkerProcess {
         PatternTree patternTree = new PatternTree();
         patternTree.getTree().get(0).addAll(patternTreeNodes);
         int level = 0;
-        List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram().stream().map(FrequencyStatistics::getType).collect(Collectors.toList());
         while (level < config.getK()) {
             List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(vertexTypesToActiveAttributesMap, edgeData, patternTree, level)
                     .stream()
@@ -116,27 +120,20 @@ public class WorkerProcess {
                     entityURIsByPTN.put(newPattern, new HashMap<>());
                 }
 
-                Map<Integer, List<Job>> newJobsList = new HashMap<>();
-                for (int index : assignedJobsBySnapshot.keySet()) {
-                    List<Job> newJobsAtIndex = new ArrayList<>();
-                    for (Job job : assignedJobsBySnapshot.get(index)) {
-                        if (job.getPatternTreeNode().getPattern().equals(vSpawnedPatterns.getOldPattern().getPattern())) {
-                            // TODO: change Diameter here? CurrentLevel + 1?
-                            Job newJob = new Job(job.getCenterNode(), newPattern);
-                            newJobsAtIndex.add(newJob);
-                            assignedJobsBySnapshot.get(index).add(newJob);
-                        }
-                    }
-                    newJobsList.put(index, newJobsAtIndex);
-                }
+                Map<Integer, List<Job>> newJobsList = jobService.createNewJobsList(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
 
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, entityURIsByPTN, vertexTypesToActiveAttributesMap);
                 }
 
-                // 计算new Pattern的support，然后判断与theta的关系
-//                patternService.calculateTotalSupport();
+                // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
+                double newPatternSupport = patternService.calculatePatternSupport(entityURIsByPTN.get(newPattern),
+                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
+                if (newPatternSupport < config.getPatternTheta()) {
+                    newPattern.setPruned(true);
+                    continue;
+                }
 
                 // 计算新pattern的HSpawn
                 List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestampsByPTN.get(newPattern));
@@ -155,7 +152,7 @@ public class WorkerProcess {
 
         // Send data(Constant TGFDs) back to coordinator
         dataShipperService.uploadConstantTGFD(constantTGFDMap);
-        logger.info(config.getNodeName() + "Done");
+        logger.info(config.getNodeName() + " Done");
     }
 
     public void init(List<PatternTreeNode> patternTreeNodes,
@@ -180,13 +177,17 @@ public class WorkerProcess {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
 
-        for (int index = 0; index < snapShotID; index++) {
+        for (int index = 0; index <= snapShotID; index++) {
             for (Job job : newJobsList.get(index)) {
                 if (!verticesInGraph.contains(job.getCenterNode())) {
                     continue;
                 }
 
-                Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), job.getDiameter());
+                Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
+                        .flatMap(v -> v.getTypes().stream())
+                        .collect(Collectors.toSet());
+
+                Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), job.getDiameter(), validTypes);
                 job.setSubgraph(subgraph);
 
                 VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
