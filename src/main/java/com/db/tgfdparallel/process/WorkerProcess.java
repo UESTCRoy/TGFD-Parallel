@@ -194,8 +194,10 @@ public class WorkerProcess {
 
                 if (results.isomorphismExists()) {
                     Set<Set<ConstantLiteral>> matches = new HashSet<>();
+                    logger.info("Start Matching at {}", LocalDateTime.now());
                     int numOfMatchesInTimestamp = patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
                             entityURIsByPTN.get(job.getPatternTreeNode()), snapShotID, vertexTypesToActiveAttributesMap);
+                    logger.info("End Matching at {}", LocalDateTime.now());
                     matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapShotID).addAll(matches);
                 }
             }
