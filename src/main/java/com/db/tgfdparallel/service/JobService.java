@@ -45,6 +45,7 @@ public class JobService {
                     .forEach(v -> {
                         int currentJobID = jobID.incrementAndGet();
                         List<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
+                        // TODO: 这里的字段似乎只需要edges，DataShipperService的dataToBeShippedAndSend
                         Job job = new Job(currentJobID, diameter, v, fragmentsForTheInitialLoad.get(v.getUri()), edges, ptn);
                         jobsByFragmentID.get(fragmentsForTheInitialLoad.get(v.getUri())).add(job);
                         if (currentJobID % 100 == 0) {
@@ -96,6 +97,7 @@ public class JobService {
                     additionalJobs.add(newJob);
                 }
             }
+            // TODO: 可以考虑用set(jobID)，因为同样的jobID只消费一次
             assignedJobsBySnapshot.get(index).addAll(additionalJobs);
             newJobsList.put(index, newJobsAtIndex);
         }

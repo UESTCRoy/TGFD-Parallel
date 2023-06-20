@@ -69,8 +69,8 @@ public class WorkerProcess {
 
         List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
         for (int i = 0; i < changesData.size(); i++) {
-            // I create a deep copy of firstLoader here
-            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(graphLoader);
+            // I create a deep copy of previous loader (用前一个graph，而不是第一个graph)
+            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(loaders[i]);
             GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), copyOfFirstLoader);
             loaders[i + 1] = changeLoader;
         }
@@ -137,8 +137,10 @@ public class WorkerProcess {
 
                 // 计算新pattern的HSpawn
                 List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestampsByPTN.get(newPattern));
-                constantTGFDs.addAll(tgfds.get(0));
-                generalTGFDs.addAll(tgfds.get(1));
+                if (tgfds.size() == 2) {
+                    constantTGFDs.addAll(tgfds.get(0));
+                    generalTGFDs.addAll(tgfds.get(1));
+                }
             }
 
             if (level > 1) {
@@ -167,9 +169,9 @@ public class WorkerProcess {
         }
     }
 
-    public void runSnapshot(int snapShotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList, Map<PatternTreeNode,
-            List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
-                            Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+    public void runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
+                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
+                            Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
 
         logger.info("Retrieving matches for all the joblets.");
 
@@ -177,31 +179,32 @@ public class WorkerProcess {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
 
-        for (int index = 0; index <= snapShotID; index++) {
-            for (Job job : newJobsList.get(index)) {
-                if (!verticesInGraph.contains(job.getCenterNode())) {
-                    continue;
-                }
+//        for (int index = 0; index <= snapshotID; index++) {
+        for (Job job : newJobsList.get(snapshotID)) {
+            if (!verticesInGraph.contains(job.getCenterNode())) {
+                continue;
+            }
 
-                Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
-                        .flatMap(v -> v.getTypes().stream())
-                        .collect(Collectors.toSet());
+            Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
+                    .flatMap(v -> v.getTypes().stream())
+                    .collect(Collectors.toSet());
 
-                Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), job.getDiameter(), validTypes);
-                job.setSubgraph(subgraph);
+            Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), 2, validTypes);
+            // TODO: job的subGraph字段没有用？
+//            job.setSubgraph(subgraph);
 
-                VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
-
-                if (results.isomorphismExists()) {
-                    Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                    logger.info("Start Matching at {}", LocalDateTime.now());
-                    int numOfMatchesInTimestamp = patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
-                            entityURIsByPTN.get(job.getPatternTreeNode()), snapShotID, vertexTypesToActiveAttributesMap);
-                    logger.info("End Matching at {}", LocalDateTime.now());
-                    matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapShotID).addAll(matches);
-                }
+            VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
+            if (results.isomorphismExists()) {
+                Set<Set<ConstantLiteral>> matches = new HashSet<>();
+                logger.info("Start Matching at {}", LocalDateTime.now());
+                int numOfMatchesInTimestamp = patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
+                        entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
+                logger.info("End Matching at {}", LocalDateTime.now());
+                matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
             }
         }
     }
-
+//        }
 }
+
+
