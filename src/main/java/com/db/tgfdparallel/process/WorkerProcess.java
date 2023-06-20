@@ -194,15 +194,17 @@ public class WorkerProcess {
 //            job.setSubgraph(subgraph);
 
             VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
-
             if (results.isomorphismExists()) {
                 Set<Set<ConstantLiteral>> matches = new HashSet<>();
+                logger.info("Start Matching at {}", LocalDateTime.now());
                 int numOfMatchesInTimestamp = patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
                         entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
+                logger.info("End Matching at {}", LocalDateTime.now());
                 matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
             }
         }
-//        }
     }
-
+//        }
 }
+
+
