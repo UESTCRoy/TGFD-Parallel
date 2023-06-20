@@ -87,11 +87,12 @@ public class PatternService {
             PatternTreeNode ptn = entry.getValue();
             Set<String> validTypes = new HashSet<>();
             validTypes.add(ptnType);
-            // TODO: 我们在这里试图找出subgraph的同构，是否只过滤vertex types与ptn types完全一样
+            // 我们在这里试图找出subgraph的同构，只过滤vertex types与ptn types完全一样
             graph.vertexSet().stream()
                     .filter(vertex -> vertex.getTypes().contains(ptnType))
                     .forEach(vertex -> {
                         Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, vertex, diameter, validTypes);
+                        // TODO: 有些vertex加载后有uri属性，而有些则没有？
 
                         Set<Set<ConstantLiteral>> matches = new HashSet<>();
                         VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, ptn.getPattern(), false);
@@ -100,9 +101,9 @@ public class PatternService {
                         if (results.isomorphismExists()) {
                             numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
                         }
-                        // TODO: 找不到matches也要定义Job吗？
+                        // TODO: 找不到matches也要定义Job吗？此处再定义jobID
                         Job job = new Job(vertex, ptn);
-                        job.setSubgraph(subgraph);
+//                        job.setSubgraph(subgraph);
                         assignedJobsBySnapshot.get(snapshotID).add(job);
                         matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
                     });

@@ -31,7 +31,7 @@ public class HSpawnService {
                                           List<Set<Set<ConstantLiteral>>> matchesPerTimestamps) {
         List<List<TGFD>> result = new ArrayList<>(2);
         Graph<Vertex, RelationshipEdge> graph = patternTreeNode.getPattern().getPattern();
-
+        // TODO: 如果pth中的vertex 并没有active attribute，我们是否应该过滤掉？
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));
         LiteralTree literalTree = new LiteralTree();
 
@@ -44,7 +44,7 @@ public class HSpawnService {
         int hSpawnLimit = graph.vertexSet().size();
 
         List<LiteralTreeNode> firstLevelLiteral = activeAttributesInPattern.stream().map(x -> new LiteralTreeNode(null, x)).collect(Collectors.toList());
-        literalTree.getTree().get(0).addAll(firstLevelLiteral);
+        literalTree.getTree().add(firstLevelLiteral);
 
         for (int i = 1; i < hSpawnLimit; i++) {
             List<LiteralTreeNode> currentLiteralLevel = new ArrayList<>();
@@ -59,6 +59,7 @@ public class HSpawnService {
             List<TGFD> currentLevelGeneralTGFDs = new ArrayList<>();
 
             for (LiteralTreeNode previousLiteral : literalTreePreviousLevel) {
+                // TODO: 这个方法好像有问题
                 List<ConstantLiteral> parentsPathToRoot = getPathToRoot(previousLiteral);
 
                 // TODO: 啥是pruned
@@ -68,11 +69,9 @@ public class HSpawnService {
                 }
 
                 for (ConstantLiteral constantLiteral : activeAttributesInPattern) {
-                    //TODO: check
-//                    if (Util.onlyInterestingTGFDs && j < patternTreeNode.getGraph().vertexSet().size()) { // Ensures all vertices are involved in dependency
-//                        if (Util.isUsedVertexType(literal.getVertexType(), parentsPathToRoot))
-//                            continue;
-//                    }
+                    if (isUsedVertexType(constantLiteral.getVertexType(), parentsPathToRoot)) {
+                        continue;
+                    }
 
                     if (parentsPathToRoot.contains(constantLiteral)) {
                         logger.info("Skip. Literal already exists in path.");
@@ -80,16 +79,13 @@ public class HSpawnService {
                     }
 
                     AttributeDependency newPath = new AttributeDependency(parentsPathToRoot, constantLiteral);
-                    if (visitedPaths.contains(newPath)) { // TODO: Is this relevant anymore?
-                        logger.info("Skip. Duplicate literal path.");
-                        continue;
-                    }
 
-                    //TODO: Check
+                    // TODO: Check, 在deltaDiscovery line:60,发现没有delta的path,避免重复计算
 //                    boolean isSuperSetPath = false;
 //                    if (Util.hasSupportPruning && newPath.isSuperSetOfPath(patternTreeNode.getZeroEntityDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have no entities
 //                        System.out.println("Skip. Candidate literal path is a superset of zero-entity dependency.");
 //                        isSuperSetPath = true;
+                    // TODO: 在deltaDiscovery line:94
 //                    } else if (Util.hasMinimalityPruning && newPath.isSuperSetOfPath(patternTreeNode.getAllMinimalDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have already have a general dependency
 //                        System.out.println("Skip. Candidate literal path is a superset of minimal dependency.");
 //                        isSuperSetPath = true;
@@ -164,8 +160,9 @@ public class HSpawnService {
             Set<Set<ConstantLiteral>> matchesInOneTimeStamp = matchesPerTimestamps.get(timestamp);
             if (!matchesInOneTimeStamp.isEmpty()) {
                 for (Set<ConstantLiteral> match : matchesInOneTimeStamp) {
-                    if (match.size() < attributes.getLhs().size() + 1)
+                    if (match.size() < attributes.getLhs().size() + 1) {
                         continue;
+                    }
 
                     Set<ConstantLiteral> entity = new HashSet<>();
                     ConstantLiteral rhs = null;
@@ -179,12 +176,13 @@ public class HSpawnService {
                                 entity.add(literalInMatch);
                         }
                     }
-                    if (entity.size() < xAttributes.size() || rhs == null)
+                    if (entity.size() < xAttributes.size() || rhs == null) {
                         continue;
+                    }
 
 //                    entitiesWithRHSvalues.get(entity).get(rhs).set(timestamp, entitiesWithRHSvalues.get(entity).get(rhs).get(timestamp) + 1);
                     Map<ConstantLiteral, List<Integer>> entityRHSvalues = entitiesWithRHSvalues.getOrDefault(entity, new HashMap<>());
-                    List<Integer> rhsValues = entityRHSvalues.getOrDefault(rhs, new ArrayList<>(config.getTimestamp()));
+                    List<Integer> rhsValues = entityRHSvalues.getOrDefault(rhs, new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
                     rhsValues.set(timestamp, rhsValues.get(timestamp) + 1);
                     entityRHSvalues.put(rhs, rhsValues);
                     entitiesWithRHSvalues.put(entity, entityRHSvalues);
@@ -210,5 +208,14 @@ public class HSpawnService {
             entitiesWithSortedRHSvalues.put(entityEntry.getKey(), sortedRhsMapOfEntity);
         }
         return entitiesWithSortedRHSvalues;
+    }
+
+    private boolean isUsedVertexType(String vertexType, List<ConstantLiteral> parentsPathToRoot) {
+        for (ConstantLiteral literal : parentsPathToRoot) {
+            if (literal.getVertexType().equals(vertexType)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
