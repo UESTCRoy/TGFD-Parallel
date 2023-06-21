@@ -1,5 +1,6 @@
 package com.db.tgfdparallel.service;
 
+import com.amazonaws.services.dynamodbv2.xspec.S;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import org.jgrapht.Graph;
@@ -9,10 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -56,6 +54,27 @@ public class JobService {
         return jobsByFragmentID;
     }
 
+    public Map<Integer, List<RelationshipEdge>> defineEdgesToBeShipped(Graph<Vertex, RelationshipEdge> graph, Map<String, Integer> fragmentsForTheInitialLoad,
+                                                                       List<PatternTreeNode> singlePatternTreeNodes) {
+        Map<Integer, List<RelationshipEdge>> edgesInfo = new HashMap<>();
+        IntStream.rangeClosed(1, config.getWorkers().size())
+                .forEach(i -> edgesInfo.put(i, new ArrayList<>()));
+        // TODO: 这里的diameter是不是应该设为1？
+        int diameter = 1;
+
+        for (PatternTreeNode ptn : singlePatternTreeNodes) {
+            String centerNodeType = ptn.getPattern().getCenterVertexType();
+            graph.vertexSet().stream()
+                    .filter(v -> v.getTypes().contains(centerNodeType))
+                    .forEach(v -> {
+                        List<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
+                        edgesInfo.get(fragmentsForTheInitialLoad.get(v.getUri())).addAll(edges);
+                    });
+        }
+
+        return edgesInfo;
+    }
+
     // TODO: we might not need this function, because worker doesn't need jobs, it could only based on singleNodePattern
     public void jobAssigner(Map<Integer, List<Job>> jobsByFragmentID) {
         logger.info("*JOB ASSIGNER*: Jobs are received to be assigned to the workers");
@@ -85,14 +104,14 @@ public class JobService {
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
     }
 
-    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, List<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
         Map<Integer, List<Job>> newJobsList = new HashMap<>();
         for (int index : assignedJobsBySnapshot.keySet()) {
             List<Job> newJobsAtIndex = new ArrayList<>();
             List<Job> additionalJobs = new ArrayList<>();
             for (Job job : assignedJobsBySnapshot.get(index)) {
                 if (job.getPatternTreeNode().getPattern().equals(pattern)) {
-                    Job newJob = new Job(job.getCenterNode(), newPattern);
+                    Job newJob = new Job(job.getID(), job.getCenterNode(), newPattern);
                     newJobsAtIndex.add(newJob);
                     additionalJobs.add(newJob);
                 }

@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -77,10 +78,11 @@ public class PatternService {
                                                 Map<String, PatternTreeNode> singlePatternTreeNodesMap,
                                                 Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                 Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
-                                                Map<Integer, List<Job>> assignedJobsBySnapshot) {
+                                                Map<Integer, Set<Job>> assignedJobsBySnapshot) {
         // TODO: how should we set the diameter?
         int diameter = 2;
-        assignedJobsBySnapshot.put(snapshotID, new ArrayList<>());
+        AtomicInteger jobID = new AtomicInteger(0);
+        assignedJobsBySnapshot.put(snapshotID, new HashSet<>());
 
         for (Map.Entry<String, PatternTreeNode> entry : singlePatternTreeNodesMap.entrySet()) {
             String ptnType = entry.getKey();
@@ -102,7 +104,8 @@ public class PatternService {
                             numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
                         }
                         // TODO: 找不到matches也要定义Job吗？此处再定义jobID
-                        Job job = new Job(vertex, ptn);
+                        int currentJobID = jobID.incrementAndGet();
+                        Job job = new Job(currentJobID, vertex, ptn);
 //                        job.setSubgraph(subgraph);
                         assignedJobsBySnapshot.get(snapshotID).add(job);
                         matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
@@ -361,7 +364,7 @@ public class PatternService {
     }
 
     private Vertex isDuplicateVertex(VF2PatternGraph newPattern, String vertexType) {
-        return (Vertex) newPattern.getPattern().vertexSet().stream()
+        return newPattern.getPattern().vertexSet().stream()
                 .filter(v -> v.getTypes().contains(vertexType))
                 .findFirst()
                 .orElse(null);

@@ -29,7 +29,10 @@ public class HSpawnService {
 
     public List<List<TGFD>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
                                           List<Set<Set<ConstantLiteral>>> matchesPerTimestamps) {
-        List<List<TGFD>> result = new ArrayList<>(2);
+        List<List<TGFD>> result = Collections.nCopies(2, new ArrayList<TGFD>())
+                .stream()
+                .map(ArrayList::new)
+                .collect(Collectors.toList());
         Graph<Vertex, RelationshipEdge> graph = patternTreeNode.getPattern().getPattern();
         // TODO: 如果pth中的vertex 并没有active attribute，我们是否应该过滤掉？
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));

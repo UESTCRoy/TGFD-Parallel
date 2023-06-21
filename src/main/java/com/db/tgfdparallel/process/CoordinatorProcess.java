@@ -68,11 +68,10 @@ public class CoordinatorProcess {
         Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(config.getSplitGraphPath());
 
         // Define jobs and assign them to the workers
-        Map<Integer, List<Job>> jobsByFragmentID = jobService.defineJobs(firstLoader.getGraph().getGraph(), fragmentsForTheInitialLoad, patternTreeNodes);
-//        jobService.jobAssigner(jobsByFragmentID);
+        Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstLoader.getGraph().getGraph(), fragmentsForTheInitialLoad, patternTreeNodes);
 
         // Send the edge data to the workers
-        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, jobsByFragmentID, fragmentsForTheInitialLoad);
+        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, edgesToBeShipped, fragmentsForTheInitialLoad);
         dataShipperService.edgeShipper(listOfFiles);
 
         // Send the changes to the workers

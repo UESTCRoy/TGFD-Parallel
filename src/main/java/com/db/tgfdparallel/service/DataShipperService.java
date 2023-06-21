@@ -30,13 +30,13 @@ public class DataShipperService {
         this.s3Service = s3Service;
     }
 
-    public Map<Integer, List<String>> dataToBeShippedAndSend(int batchSize, Map<Integer, List<Job>> jobsByFragmentID, Map<String, Integer> fragments) {
+    public Map<Integer, List<String>> dataToBeShippedAndSend(int batchSize, Map<Integer, List<RelationshipEdge>> edgesToBeShipped, Map<String, Integer> fragments) {
         Map<Integer, Map<Integer, List<SimpleEdge>>> batchDataToBeShipped = new HashMap<>();
         Map<Integer, List<String>> listOfFiles = new HashMap<>();
 
-        for (int i : jobsByFragmentID.keySet()) {
+        for (int i : edgesToBeShipped.keySet()) {
             Map<Integer, List<SimpleEdge>> innerMap = new HashMap<>();
-            for (int j : jobsByFragmentID.keySet()) {
+            for (int j : edgesToBeShipped.keySet()) {
                 if (i != j) {
                     innerMap.put(j, new ArrayList<>());
                 }
@@ -46,36 +46,34 @@ public class DataShipperService {
 
         int count = 0;
 
-        for (int fragmentID : jobsByFragmentID.keySet()) {
-            for (Job job : jobsByFragmentID.get(fragmentID)) {
-                for (RelationshipEdge edge : job.getEdges()) {
-                    String srcVertex = edge.getSource().getUri();
-                    String dstVertex = edge.getTarget().getUri();
+        for (int fragmentID : edgesToBeShipped.keySet()) {
+            for (RelationshipEdge edge : edgesToBeShipped.get(fragmentID)) {
+                String srcVertex = edge.getSource().getUri();
+                String dstVertex = edge.getTarget().getUri();
 
-                    if (fragments.get(srcVertex) != fragmentID && fragments.get(dstVertex) == fragmentID) {
-                        batchDataToBeShipped.get(fragments.get(srcVertex))
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
-                    } else if (fragments.get(srcVertex) == fragmentID && fragments.get(dstVertex) != fragmentID) {
-                        batchDataToBeShipped.get(fragments.get(dstVertex))
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
-                    } else if (fragments.get(srcVertex) != fragmentID && fragments.get(dstVertex) != fragmentID) {
-                        batchDataToBeShipped.get(fragments.get(dstVertex))
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
-                        batchDataToBeShipped.get(fragments.get(srcVertex))
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
-                    }
+                if (fragments.get(srcVertex) != fragmentID && fragments.get(dstVertex) == fragmentID) {
+                    batchDataToBeShipped.get(fragments.get(srcVertex))
+                            .get(fragmentID)
+                            .add(new SimpleEdge(edge));
+                } else if (fragments.get(srcVertex) == fragmentID && fragments.get(dstVertex) != fragmentID) {
+                    batchDataToBeShipped.get(fragments.get(dstVertex))
+                            .get(fragmentID)
+                            .add(new SimpleEdge(edge));
+                } else if (fragments.get(srcVertex) != fragmentID && fragments.get(dstVertex) != fragmentID) {
+                    batchDataToBeShipped.get(fragments.get(dstVertex))
+                            .get(fragmentID)
+                            .add(new SimpleEdge(edge));
+                    batchDataToBeShipped.get(fragments.get(srcVertex))
+                            .get(fragmentID)
+                            .add(new SimpleEdge(edge));
+                }
 
-                    count++;
+                count++;
 
-                    if (count >= batchSize) {
-                        sendEdgesToWorkersForShipment(batchDataToBeShipped, listOfFiles);
-                        clearBatchData(batchDataToBeShipped);
-                        count = 0;
-                    }
+                if (count >= batchSize) {
+                    sendEdgesToWorkersForShipment(batchDataToBeShipped, listOfFiles);
+                    clearBatchData(batchDataToBeShipped);
+                    count = 0;
                 }
             }
         }
