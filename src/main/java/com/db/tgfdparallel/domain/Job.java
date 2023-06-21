@@ -1,12 +1,15 @@
 package com.db.tgfdparallel.domain;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.jgrapht.Graph;
 
 import java.util.List;
 
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Job {
+    @EqualsAndHashCode.Include
     private int ID;
     private int diameter;
     private Vertex centerNode;
@@ -24,7 +27,8 @@ public class Job {
         this.patternTreeNode = patternTreeNode;
     }
 
-    public Job(Vertex centerNode, PatternTreeNode patternTreeNode) {
+    public Job(int ID, Vertex centerNode, PatternTreeNode patternTreeNode) {
+        this.ID = ID;
         this.centerNode = centerNode;
         this.patternTreeNode = patternTreeNode;
     }

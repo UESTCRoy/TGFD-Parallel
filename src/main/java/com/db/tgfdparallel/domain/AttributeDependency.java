@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Set;
 
 @Data
-@NoArgsConstructor
 public class AttributeDependency {
     Set<ConstantLiteral> lhs;
     ConstantLiteral rhs;
@@ -17,5 +16,9 @@ public class AttributeDependency {
     public AttributeDependency(List<ConstantLiteral> pathToRoot, ConstantLiteral rhs) {
         this.lhs = new HashSet<>(pathToRoot);
         this.rhs = rhs;
+    }
+
+    public AttributeDependency() {
+        this.lhs = new HashSet<>();
     }
 }

@@ -78,7 +78,7 @@ public class WorkerProcess {
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
         Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN = new HashMap<>();
-        Map<Integer, List<Job>> assignedJobsBySnapshot = new HashMap<>();
+        Map<Integer, Set<Job>> assignedJobsBySnapshot = new HashMap<>();
         init(patternTreeNodes, matchesPerTimestampsByPTN, entityURIsByPTN);
 
         // run first level matches

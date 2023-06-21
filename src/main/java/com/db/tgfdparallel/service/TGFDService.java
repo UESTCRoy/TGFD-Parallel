@@ -2,6 +2,7 @@ package com.db.tgfdparallel.service;
 
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
+import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,24 +18,23 @@ import java.util.stream.Collectors;
 public class TGFDService {
     private static final Logger logger = LoggerFactory.getLogger(TGFDService.class);
     private final AppConfig config;
-    private final PatternService patternService;
 
     @Autowired
-    public TGFDService(AppConfig config, PatternService patternService) {
+    public TGFDService(AppConfig config) {
         this.config = config;
-        this.patternService = patternService;
     }
 
     public List<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
                                            Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities,
                                            Map<Pair, List<TreeSet<Pair>>> deltaToPairsMap) {
+
         List<TGFD> tgfds = new ArrayList<>();
 
         String yVertexType = yLiteral.getVertexType();
         String yAttrName = yLiteral.getAttrName();
 
         for (Map.Entry<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
-            VF2PatternGraph newPattern = patternService.copyGraph(patternNode.getPattern().getPattern());
+            VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(patternNode.getPattern());
             DataDependency newDependency = new DataDependency();
             AttributeDependency constantPath = new AttributeDependency();
             String attrValue = entityEntry.getValue().get(0).getKey().getAttrValue();
@@ -84,14 +84,16 @@ public class TGFDService {
                 int minDistance = candidateDelta.getMin();
                 int maxDistance = candidateDelta.getMax();
                 if (minDistance <= maxDistance) {
-                    System.out.println("Calculating support for candidate delta (" + minDistance + "," + maxDistance + ")");
                     List<Integer> timestampCounts = rhsAttrValuesTimestampsSortedByFreq.get(0).getValue();
                     TreeSet<Pair> satisfyingPairs = new TreeSet<>();
                     for (int index = 0; index < timestampCounts.size(); index++) {
                         int indexCount = timestampCounts.get(index);
-                        if (indexCount == 0) continue;
-                        if (indexCount > 1 && 0 >= minDistance && 0 <= maxDistance)
+                        if (indexCount == 0) {
+                            continue;
+                        }
+                        if (indexCount > 1 && 0 >= minDistance && 0 <= maxDistance) {
                             satisfyingPairs.add(new Pair(index, index));
+                        }
                         for (int j = index + 1; j < timestampCounts.size(); j++) {
                             int jCount = timestampCounts.get(j);
                             if (jCount > 0) {
@@ -102,7 +104,6 @@ public class TGFDService {
                             }
                         }
                     }
-                    System.out.println("Satisfying pairs: " + satisfyingPairs);
                     double candidateSupport = calculateTGFDSupport(satisfyingPairs.size(), entities.size(), config.getTimestamp());
                     if (candidateSupport > candidateTGFDsupport) {
                         candidateTGFDsupport = candidateSupport;
@@ -113,7 +114,7 @@ public class TGFDService {
             }
 
             if (mostSupportedDelta == null) {
-                System.out.println("Could not come up with mostSupportedDelta for entity: " + entityEntry.getKey());
+                logger.error("Could not come up with mostSupportedDelta for entity: " + entityEntry.getKey());
                 continue;
             }
 
