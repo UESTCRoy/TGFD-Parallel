@@ -144,7 +144,7 @@ public class GraphService {
             Attribute attr = attributeChange.getAttribute();
             Set<Attribute> attributes = vertex.getAttributes();
 
-            // TODO: equals() and hashCode() only work on attrName
+            // equals() and hashCode() only work on attrName
             if (changeType == ChangeType.insertAttr) {
                 attributes.add(attr);
             } else if (changeType == ChangeType.deleteAttr) {
@@ -162,16 +162,11 @@ public class GraphService {
     }
 
     // TODO: 与原来的缺了allGroupedChanges
-    public List<Change> loadChanges(JSONArray jsonArray, Set<String> vertexSets, Map<String, Set<String>> typeChangeURIs, boolean considerEdgeChanges) {
+    public List<Change> loadChanges(JSONArray jsonArray, boolean considerEdgeChanges) {
         List<Change> allChanges = new ArrayList<>();
         for (Object o : jsonArray) {
             JSONObject object = (JSONObject) o;
             JSONArray objectArray = (JSONArray) object.get("types");
-            Set<String> relevantTypes = new HashSet<>();
-            for(int i = 0; i < objectArray.length(); i++){
-                relevantTypes.add(objectArray.getString(i));
-            }
-
             ChangeType type = ChangeType.valueOf((String) object.get("typeOfChange"));
             int id = Integer.parseInt(object.get("id").toString());
 
@@ -185,14 +180,6 @@ public class GraphService {
                 case insertEdge:
                     String srcURI = (String) object.get("src");
                     String dstURI = (String) object.get("dst");
-
-                    if (vertexSets != null && vertexSets.stream().noneMatch(s -> relevantTypes.contains(s))) {
-                        if (notURIofInterest(srcURI, vertexSets, typeChangeURIs)) {
-                            continue;
-                        } else if (notURIofInterest(dstURI, vertexSets, typeChangeURIs)) {
-                            continue;
-                        }
-                    }
                     String label = (String) object.get("label");
                     change = new EdgeChange(id, type, srcURI, dstURI, label);
                     break;
@@ -200,11 +187,6 @@ public class GraphService {
                 case deleteAttr:
                 case insertAttr:
                     String uri = (String) object.get("uri");
-
-                    if (vertexSets != null && vertexSets.stream().noneMatch(s -> relevantTypes.contains(s)) && notURIofInterest(uri, vertexSets, typeChangeURIs)) {
-                        continue;
-                    }
-
                     JSONObject attrObject = (JSONObject) object.get("attribute");
                     String attrName = (String) attrObject.get("attrName");
                     String attrValue = (String) attrObject.get("attrValue");
@@ -214,11 +196,6 @@ public class GraphService {
                     Vertex previousVertex = getVertex((JSONObject) object.get("previousVertex"));
                     Vertex newVertex = getVertex((JSONObject) object.get("newVertex"));
                     String uriOfType = (String) object.get("uri");
-
-                    if (vertexSets != null && vertexSets.stream().noneMatch(s -> relevantTypes.contains(s)) && notURIofInterest(uriOfType, vertexSets, typeChangeURIs)) {
-                        continue;
-                    }
-
                     change = new TypeChange(id, type, uriOfType, previousVertex, newVertex);
                     break;
                 case deleteVertex:
@@ -528,16 +505,14 @@ public class GraphService {
             activeMQService.connectConsumer(config.getNodeName() + "_data");
 
             while (receiveData < dataToBeShipped.size()) {
-                logger.info("*WORKER*: Start reading data from other workers...");
                 String msg = activeMQService.receive();
-                logger.info("*WORKER*: Received a new message.");
 
                 if (msg != null) {
                     logger.info("*DATA RECEIVER*: Graph object has been received from '" + msg + "' successfully");
                     Object obj = dataShipperService.downloadObject(msg);
                     if (obj != null) {
                         Graph<Vertex, RelationshipEdge> receivedGraph = (Graph<Vertex, RelationshipEdge>) obj;
-                        logger.info("*WORKER*: Received a new graph.");
+                        logger.info("*WORKER*: Received a new graph, graph edge size: {}", receivedGraph.edgeSet().size());
                         if (receivedGraph != null) {
                             mergeGraphs(graph, receivedGraph);
                         }
@@ -546,7 +521,6 @@ public class GraphService {
                 receiveData++;
             }
             activeMQService.closeConsumer();
-//            activeMQService.sendResult(1);
         } catch (Exception e) {
             logger.error("Error while running first snapshot", e);
         }

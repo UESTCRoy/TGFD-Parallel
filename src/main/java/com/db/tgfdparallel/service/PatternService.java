@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -79,8 +80,8 @@ public class PatternService {
                                                 Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                 Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
                                                 Map<Integer, Set<Job>> assignedJobsBySnapshot) {
-        // TODO: how should we set the diameter?
-        int diameter = 2;
+        // 我们从singleNodeVertex开始，所以一开始的diameter设为0
+        int diameter = 0;
         AtomicInteger jobID = new AtomicInteger(0);
         assignedJobsBySnapshot.put(snapshotID, new HashSet<>());
 
@@ -102,13 +103,15 @@ public class PatternService {
                         int numOfMatchesInTimestamp = 0;
                         if (results.isomorphismExists()) {
                             numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
+                            // 我们目前将只考虑定义有match的job内容
+                            if (!matches.isEmpty()) {
+                                int currentJobID = jobID.incrementAndGet();
+                                Job job = new Job(currentJobID, vertex, ptn);
+                                assignedJobsBySnapshot.get(snapshotID).add(job);
+                                matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
+                                logger.info("Pattern: {} has {} matches", ptn.getPattern().getCenterVertex(), numOfMatchesInTimestamp);
+                            }
                         }
-                        // TODO: 找不到matches也要定义Job吗？此处再定义jobID
-                        int currentJobID = jobID.incrementAndGet();
-                        Job job = new Job(currentJobID, vertex, ptn);
-//                        job.setSubgraph(subgraph);
-                        assignedJobsBySnapshot.get(snapshotID).add(job);
-                        matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
                     });
         }
     }
@@ -120,6 +123,7 @@ public class PatternService {
         while (iterator.hasNext()) {
             GraphMapping<Vertex, RelationshipEdge> result = iterator.next();
             Set<ConstantLiteral> literalsInMatch = new HashSet<>();
+            // TODO: literalsInMatch不考虑uri
             String entityURI = extractMatch(result, patternTreeNode, literalsInMatch, vertexTypesToActiveAttributesMap);
 
             boolean isValidMatch = literalsInMatch.size() >= patternTreeNode.getPattern().getPattern().vertexSet().size();
@@ -142,10 +146,13 @@ public class PatternService {
         String entityURI = null;
         for (Vertex v : patternTreeNode.getPattern().getPattern().vertexSet()) {
             Vertex currentMatchedVertex = result.getVertexCorrespondence(v, false);
-            if (currentMatchedVertex == null) continue;
-            String tempEntityURI = extractAttributes(patternTreeNode, match, currentMatchedVertex, vertexTypesToActiveAttributesMap);
-            if (entityURI == null) {
-                entityURI = tempEntityURI;
+            if (currentMatchedVertex != null) {
+                String tempEntityURI = extractAttributes(patternTreeNode, match, currentMatchedVertex, vertexTypesToActiveAttributesMap);
+                if (entityURI == null && tempEntityURI != null) {
+                    entityURI = tempEntityURI;
+                } else if (entityURI == null) {
+                    entityURI = currentMatchedVertex.getUri();
+                }
             }
         }
         return entityURI;
@@ -157,43 +164,48 @@ public class PatternService {
         String centerVertexType = patternTreeNode.getPattern().getCenterVertexType();
         Set<ConstantLiteral> activeAttributes = getActiveAttributesInPattern(patternTreeNode.getPattern().getPattern().vertexSet(),
                 true, vertexTypesToActiveAttributesMap);
-        Set<String> vertexAllAttributesName = currentMatchedVertex.getAttributes().stream().map(Attribute::getAttrName).collect(Collectors.toSet());
+
+        Map<String, Attribute> vertexAllAttributesMap = currentMatchedVertex.getAttributes().stream()
+                .collect(Collectors.toMap(Attribute::getAttrName, Function.identity()));
 
         for (String matchedVertexType : currentMatchedVertex.getTypes()) {
             for (ConstantLiteral activeAttribute : activeAttributes) {
                 if (!matchedVertexType.equals(activeAttribute.getVertexType())) continue;
-                for (String matchedAttrName : vertexAllAttributesName) {
-                    if (matchedVertexType.equals(centerVertexType) && matchedAttrName.equals("uri")) {
-                        entityURI = currentMatchedVertex.getAttributes().stream().filter(attr -> attr.getAttrName().equals("uri")).findFirst().get().getAttrValue();
-                    }
-                    if (!activeAttribute.getAttrName().equals(matchedAttrName)) continue;
-                    String matchedAttrValue = currentMatchedVertex.getAttributes().stream().filter(attr -> attr.getAttrName().equals(matchedAttrName)).findFirst().get().getAttrValue();
-                    ConstantLiteral xLiteral = new ConstantLiteral(matchedVertexType, matchedAttrName, matchedAttrValue);
-                    match.add(xLiteral);
+                Attribute matchedAttribute = vertexAllAttributesMap.getOrDefault(activeAttribute.getAttrName(), null);
+                if (matchedAttribute == null) continue;
+
+                if (matchedVertexType.equals(centerVertexType) && matchedAttribute.getAttrName().equals("uri")) {
+                    entityURI = matchedAttribute.getAttrValue();
                 }
+
+                String matchedAttrValue = matchedAttribute.getAttrValue();
+                ConstantLiteral xLiteral = new ConstantLiteral(matchedVertexType, activeAttribute.getAttrName(), matchedAttrValue);
+                match.add(xLiteral);
             }
         }
+
         return entityURI;
     }
 
     public Set<ConstantLiteral> getActiveAttributesInPattern(Set<Vertex> vertexSet, boolean considerURI,
                                                              Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Map<String, Set<String>> patternVerticesAttributes = new HashMap<>();
+
         for (Vertex vertex : vertexSet) {
             for (String vertexType : vertex.getTypes()) {
-                patternVerticesAttributes.put(vertexType, new HashSet<>());
-                Set<String> attrNameSet = vertexTypesToActiveAttributesMap.get(vertexType);
-                if (attrNameSet != null) {
-                    patternVerticesAttributes.get(vertexType).addAll(attrNameSet);
-                }
+                Set<String> attrNameSet = vertexTypesToActiveAttributesMap.getOrDefault(vertexType, new HashSet<>());
+                patternVerticesAttributes.putIfAbsent(vertexType, new HashSet<>(attrNameSet));
             }
         }
+
         Set<ConstantLiteral> literals = new HashSet<>();
-        for (String vertexType : patternVerticesAttributes.keySet()) {
+
+        for (Map.Entry<String, Set<String>> entry : patternVerticesAttributes.entrySet()) {
+            String vertexType = entry.getKey();
             if (considerURI) literals.add(new ConstantLiteral(vertexType, "uri", null));
-            for (String attrName : patternVerticesAttributes.get(vertexType)) {
-                ConstantLiteral literal = new ConstantLiteral(vertexType, attrName, null);
-                literals.add(literal);
+
+            for (String attrName : entry.getValue()) {
+                literals.add(new ConstantLiteral(vertexType, attrName, null));
             }
         }
         return literals;
@@ -292,7 +304,6 @@ public class PatternService {
                     }
 
                     pattern.setOldPattern(ptn);
-//                    VF2PatternGraph newPattern = copyGraph(graph);
                     VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(ptn.getPattern());
                     Graph<Vertex, RelationshipEdge> graph = newPattern.getPattern();
                     if (targetVertex == null) {
@@ -376,7 +387,6 @@ public class PatternService {
 
         // Copy vertices and create a mapping from the original vertices to the new ones
         for (Vertex v : graph.vertexSet()) {
-//            Vertex newVertex = v.copy();
             Vertex newVertex = graphService.copyVertex(v);
             addVertex(newPattern, newVertex);
             vertexMap.put(v, newVertex);
@@ -449,13 +459,10 @@ public class PatternService {
     }
 
     public void findCenterVertexParent(PatternTreeNode node, List<PatternTreeNode> nodes) {
-        System.out.println("Finding center vertex parent...");
         Set<String> newPatternEdges = node.getPattern().getPattern().edgeSet().stream().map(Object::toString).collect(Collectors.toSet());
-        List<PatternTreeNode> almostParents = new ArrayList<>();
         for (PatternTreeNode otherPatternNode : nodes) {
             Set<String> otherPatternEdges = otherPatternNode.getPattern().getPattern().edgeSet().stream().map(Object::toString).collect(Collectors.toSet());
             if (newPatternEdges.containsAll(otherPatternEdges)) {
-                almostParents.add(otherPatternNode);
                 if (otherPatternNode.getPattern().getCenterVertexType().equals(node.getPattern().getCenterVertexType())) {
                     printParent(node, otherPatternNode);
                     node.setCenterVertexParent(otherPatternNode);
@@ -463,23 +470,24 @@ public class PatternService {
                 }
             }
         }
-//        if (node.getCenterVertexParent() == null) {
-//            for (PatternTreeNode otherPatternNode : this.getTree().get(0)) {
-//                if (otherPatternNode.getPattern().getCenterVertexType().equals(node.getPattern().getCenterVertexType())) {
-//                    printParent(node, otherPatternNode);
-//                    node.setCenterVertexParent(otherPatternNode);
-//                    return;
-//                }
-//            }
-//        }
+
+        if (node.getCenterVertexParent() == null) {
+            for (PatternTreeNode otherPatternNode : nodes) {
+                if (otherPatternNode.getPattern().getCenterVertexType().equals(node.getPattern().getCenterVertexType())) {
+                    printParent(node, otherPatternNode);
+                    node.setCenterVertexParent(otherPatternNode);
+                    return;
+                }
+            }
+        }
     }
 
     private void printParent(PatternTreeNode node, PatternTreeNode otherPatternNode) {
-        System.out.println("New pattern: " + node.getPattern());
+        logger.info("New pattern: " + node.getPattern());
         if (otherPatternNode.getPattern().getPattern().edgeSet().size() == 0) {
-            System.out.println("is a child of center vertex parent pattern: " + otherPatternNode.getPattern().getPattern().vertexSet());
+            logger.info("is a child of center vertex parent pattern: " + otherPatternNode.getPattern().getPattern().vertexSet());
         } else {
-            System.out.println("is a child of center vertex parent pattern: " + otherPatternNode.getPattern());
+            logger.info("is a child of center vertex parent pattern: " + otherPatternNode.getPattern());
         }
     }
 

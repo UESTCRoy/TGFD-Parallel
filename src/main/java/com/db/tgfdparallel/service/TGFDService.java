@@ -70,7 +70,11 @@ public class TGFDService {
 
             // 处理Positive与Negative的情况
             if (rhsAttrValuesTimestampsSortedByFreq.size() == 1) {
-
+                List<Integer> timestampCounts = rhsAttrValuesTimestampsSortedByFreq.get(0).getValue();
+                Pair candidateDelta = getMinMaxPair(timestampCounts);
+                if (candidateDelta != null) {
+                    candidateDeltas.add(candidateDelta);
+                }
             } else if (rhsAttrValuesTimestampsSortedByFreq.size() > 1) {
 
             }
@@ -227,7 +231,7 @@ public class TGFDService {
         return tgfds;
     }
 
-    public double calculateTGFDSupport(double numerator, double S, int T) {
+    private double calculateTGFDSupport(double numerator, double S, int T) {
         double denominator = S * CombinatoricsUtils.binomialCoefficient(T + 1, 2);
         if (numerator > denominator)
             throw new IllegalArgumentException("numerator > denominator");
@@ -238,9 +242,48 @@ public class TGFDService {
         List<ConstantLiteral> collect = dependency.getX().stream().map(x -> (ConstantLiteral) x).sorted().collect(Collectors.toList());
         StringBuilder sb = new StringBuilder();
         for (ConstantLiteral data : collect) {
-            sb.append(data.getVertexType() + data.getAttrName() + data.getAttrValue());
+            sb.append(data.getVertexType()).append(data.getAttrName()).append(data.getAttrValue());
         }
         return sb.hashCode();
+    }
+
+    private Pair getMinMaxPair(List<Integer> timestampCounts) {
+        int minDistance, maxDistance;
+        List<Integer> occurIndices = new ArrayList<>();
+
+        for (int index = 0; index < timestampCounts.size(); index++) {
+            if (timestampCounts.get(index) > 0) {
+                occurIndices.add(index);
+            }
+        }
+
+        if (occurIndices.isEmpty()) {
+            return null;
+        }
+
+        minDistance = Integer.MAX_VALUE;
+        for (int i = 1; i < occurIndices.size(); i++) {
+            minDistance = Math.min(minDistance, occurIndices.get(i) - occurIndices.get(i - 1));
+            if (minDistance == 0) {
+                break;
+            }
+        }
+
+        Integer indexOfFirstOccurrence = occurIndices.get(0);
+        Integer indexOfFinalOccurrence = occurIndices.get(occurIndices.size() - 1);
+
+        if (indexOfFirstOccurrence.equals(indexOfFinalOccurrence) && timestampCounts.get(indexOfFirstOccurrence) > 1) {
+            maxDistance = 0;
+        } else {
+            maxDistance = indexOfFinalOccurrence - indexOfFirstOccurrence;
+        }
+
+        if (minDistance > maxDistance) {
+            logger.info("Not enough timestamped matches found for entity.");
+            return null;
+        }
+
+        return new Pair(minDistance, maxDistance);
     }
 
 }

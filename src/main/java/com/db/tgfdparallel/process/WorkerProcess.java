@@ -48,19 +48,25 @@ public class WorkerProcess {
 
         // Receive the histogram data from the coordinator
         // TODO: histogram字段并不全部有用
+        long histogramStartTime = System.currentTimeMillis();
         ProcessedHistogramData histogramData = dataShipperService.receiveHistogramData();
+        long histogramEndTime = System.currentTimeMillis();
+        logger.info("Received Histogram From Coordinator, {} ms", histogramEndTime - histogramStartTime);
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
         List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram().stream().map(FrequencyStatistics::getType).collect(Collectors.toList());
         Map<String, Integer> vertexHistogram = histogramData.getVertexHistogram();
 
         // Receive the pattern tree from the coordinator
+        long singlePatternStartTime = System.currentTimeMillis();
         List<PatternTreeNode> patternTreeNodes = dataShipperService.receiveSinglePatternNode();
+        long singlePatternEndTime = System.currentTimeMillis();
+        logger.info("Received singlePatternTreeNodes From Coordinator, {} ms", singlePatternEndTime - singlePatternStartTime);
 
         // Load the first snapshot
         GraphLoader graphLoader = graphService.loadFirstSnapshot(config.getDataPath());
-
-        // TODO: 之前通过MQ worker接受一个很大的String job: id # CenterNodeVertexID # diameter # FragmentID # Type, 改进：针对每个worker创建一个job队列
-        // TODO: 我们可能都不需要发送job了，因为worker可以根据singleNodePattern来生成job
+        logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
+                graphLoader.getGraph().getGraph().edgeSet().size(),
+                graphLoader.getGraph().getGraph().vertexSet().size());
 
         // By using the change file, generate new loader for each snapshot
         GraphLoader[] loaders = new GraphLoader[config.getTimestamp()];
@@ -124,7 +130,7 @@ public class WorkerProcess {
 
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
-                    runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, entityURIsByPTN, vertexTypesToActiveAttributesMap);
+                    runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
                 }
 
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
@@ -170,7 +176,7 @@ public class WorkerProcess {
     }
 
     public void runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
-                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
+                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                             Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
 
         logger.info("Retrieving matches for all the joblets.");
@@ -189,11 +195,10 @@ public class WorkerProcess {
                     .flatMap(v -> v.getTypes().stream())
                     .collect(Collectors.toSet());
 
-            Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), 2, validTypes);
-            // TODO: job的subGraph字段没有用？
-//            job.setSubgraph(subgraph);
-
+            // Diameter 根据level变化
+            Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
             VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
+
             if (results.isomorphismExists()) {
                 Set<Set<ConstantLiteral>> matches = new HashSet<>();
                 logger.info("Start Matching at {}", LocalDateTime.now());

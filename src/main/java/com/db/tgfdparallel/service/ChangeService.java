@@ -37,7 +37,7 @@ public class ChangeService {
                     if (json == null) {
                         throw new RuntimeException("Failed to read JSON from file: " + path);
                     } else {
-                        List<Change> changes = graphService.loadChanges(json, null, null, true);
+                        List<Change> changes = graphService.loadChanges(json, true);
                         sortChanges(changes);
                         return changes;
                     }
