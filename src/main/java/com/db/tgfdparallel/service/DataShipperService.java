@@ -300,7 +300,7 @@ public class DataShipperService {
         activeMQService.connectProducer();
         activeMQService.send(config.getWorkers().get(workerID - 1) + "_data", key);
         activeMQService.closeProducer();
-        logger.info("*DATA SENDER*: Graph object has been sent to '" + config.getWorkers().get(workerID - 1) + "' successfully");
+        logger.info("*DATA SENDER*: Graph object has been sent to {} with edge size: {}", config.getWorkers().get(workerID - 1), vertexRelationshipEdgeGraph.edgeSet().size());
     }
 
     public Object downloadObject(String msg) throws IOException {
@@ -361,6 +361,7 @@ public class DataShipperService {
                         if (obj != null) {
                             List<Change> changeList = (List<Change>) obj;
                             changesData.add(changeList);
+                            logger.info("Received {} changes from Coordinator", changeList.size());
                         }
                     }
                     changeReceived = true;
