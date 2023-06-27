@@ -84,7 +84,7 @@ public class WorkerProcess {
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
         Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN = new HashMap<>();
-        Map<Integer, Set<Job>> assignedJobsBySnapshot = new HashMap<>();
+        Map<Integer, List<Job>> assignedJobsBySnapshot = new HashMap<>();
         init(patternTreeNodes, matchesPerTimestampsByPTN, entityURIsByPTN);
 
         // run first level matches
@@ -125,9 +125,8 @@ public class WorkerProcess {
                     matchesPerTimestampsByPTN.get(newPattern).add(new HashSet<>());
                     entityURIsByPTN.put(newPattern, new HashMap<>());
                 }
-                // TODO: level2没有new job,问题在于newPattern多了attributes的属性
-                Map<Integer, List<Job>> newJobsList = jobService.createNewJobsList(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
 
+                Map<Integer, List<Job>> newJobsList = jobService.createNewJobsList(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
@@ -143,8 +142,7 @@ public class WorkerProcess {
                 }
 
                 // 计算新pattern的HSpawn
-                PatternTreeNode copyOfNewPattern = DeepCopyUtil.deepCopy(newPattern);
-                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, copyOfNewPattern, matchesPerTimestampsByPTN.get(newPattern));
+                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestampsByPTN.get(newPattern));
                 if (tgfds.size() == 2 && level > 1) {
                     constantTGFDs.addAll(tgfds.get(0));
                     generalTGFDs.addAll(tgfds.get(1));

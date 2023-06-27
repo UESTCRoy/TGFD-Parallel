@@ -158,7 +158,7 @@ public class TGFDService {
 //                negativeTGFDs.add(new NegativeTGFD(entityEntry));
                 logger.info("Could not satisfy TGFD support threshold for entity: " + entityEntry.getKey());
             } else {
-                TGFD entityTGFD = new TGFD(newPattern, candidateTGFDdelta, newDependency, candidateTGFDsupport, patternNode.getPatternSupport());
+                TGFD entityTGFD = new TGFD(patternNode.getPattern(), candidateTGFDdelta, newDependency, candidateTGFDsupport, patternNode.getPatternSupport());
                 tgfds.add(entityTGFD);
 //                if (Util.hasMinimalityPruning) patternNode.addMinimalConstantDependency(constantPath);
             }

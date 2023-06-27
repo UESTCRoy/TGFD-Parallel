@@ -103,7 +103,7 @@ public class JobService {
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
     }
 
-    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, List<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
         Map<Integer, List<Job>> newJobsList = new HashMap<>();
         for (int index : assignedJobsBySnapshot.keySet()) {
             List<Job> newJobsAtIndex = new ArrayList<>();

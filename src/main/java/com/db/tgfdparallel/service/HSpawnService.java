@@ -2,6 +2,7 @@ package com.db.tgfdparallel.service;
 
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
+import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.jgrapht.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,12 +39,6 @@ public class HSpawnService {
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));
         LiteralTree literalTree = new LiteralTree();
 
-        // TODO: 设置多少hspawn limit?
-//        if (Util.onlyInterestingTGFDs) {
-//            hSpawnLimit = Math.max(patternTreeNode.getGraph().vertexSet().size(), Util.maxNumOfLiterals);
-//        } else {
-//            hSpawnLimit = Util.maxNumOfLiterals;
-//        }
         int hSpawnLimit = graph.vertexSet().size();
 
         List<LiteralTreeNode> firstLevelLiteral = activeAttributesInPattern.stream().map(x -> new LiteralTreeNode(null, x)).collect(Collectors.toList());
@@ -58,11 +53,10 @@ public class HSpawnService {
             }
 
             Set<AttributeDependency> visitedPaths = new HashSet<>();
-            List<TGFD> currentLevelConstantTGFDs = new ArrayList<>();
-            List<TGFD> currentLevelGeneralTGFDs = new ArrayList<>();
+//            List<TGFD> currentLevelConstantTGFDs = new ArrayList<>();
+//            List<TGFD> currentLevelGeneralTGFDs = new ArrayList<>();
 
             for (LiteralTreeNode previousLiteral : literalTreePreviousLevel) {
-                // TODO: 这个方法好像有问题
                 List<ConstantLiteral> parentsPathToRoot = getPathToRoot(previousLiteral);
 
                 // TODO: 啥是pruned
@@ -82,43 +76,51 @@ public class HSpawnService {
                     }
 
                     AttributeDependency newPath = new AttributeDependency(parentsPathToRoot, constantLiteral);
+                    if (visitedPaths.contains(newPath)) {
+                        continue;
+                    }
+                    visitedPaths.add(newPath);
 
                     // TODO: Check, 在deltaDiscovery line:60,发现没有delta的path,避免重复计算
 //                    boolean isSuperSetPath = false;
-//                    if (Util.hasSupportPruning && newPath.isSuperSetOfPath(patternTreeNode.getZeroEntityDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have no entities
+//                    if (Util.hasSupportPruning && newPath.isSuperSetOfPath(copyOfNewPattern.getZeroEntityDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have no entities
 //                        System.out.println("Skip. Candidate literal path is a superset of zero-entity dependency.");
 //                        isSuperSetPath = true;
                     // TODO: 在deltaDiscovery line:94
-//                    } else if (Util.hasMinimalityPruning && newPath.isSuperSetOfPath(patternTreeNode.getAllMinimalDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have already have a general dependency
+//                    } else if (Util.hasMinimalityPruning && newPath.isSuperSetOfPath(copyOfNewPattern.getAllMinimalDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have already have a general dependency
 //                        System.out.println("Skip. Candidate literal path is a superset of minimal dependency.");
 //                        isSuperSetPath = true;
 //                    }
 
-                    visitedPaths.add(newPath);
                     LiteralTreeNode node = new LiteralTreeNode(previousLiteral, constantLiteral);
                     currentLiteralLevel.add(node);
+                    if (i != hSpawnLimit - 1) {
+                        continue;
+                    }
 
                     //TODO: Check
 //                    if (Util.onlyInterestingTGFDs) { // Ensures all vertices are involved in dependency
-//                        if (Util.literalPathIsMissingTypesInPattern(literalTreeNode.getPathToRoot(), patternTreeNode.getGraph().vertexSet())) {
+//                        if (Util.literalPathIsMissingTypesInPattern(literalTreeNode.getPathToRoot(), copyOfNewPattern.getGraph().vertexSet())) {
 //                            System.out.println("Skip Delta Discovery. Literal path does not involve all pattern vertices.");
 //                            continue;
 //                        }
 //                    }
-                    addDependencyAttributesToPattern(patternTreeNode.getPattern(), newPath);
+                    PatternTreeNode copyOfNewPattern = DeepCopyUtil.deepCopy(patternTreeNode);
+                    addDependencyAttributesToPattern(copyOfNewPattern.getPattern(), newPath);
                     Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = findEntities(newPath, matchesPerTimestamps);
                     Map<Pair, List<TreeSet<Pair>>> deltaToPairsMap = new HashMap<>();
 
-                    List<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, deltaToPairsMap);
+                    List<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(copyOfNewPattern, newPath.getRhs(), entities, deltaToPairsMap);
                     result.get(0).addAll(constantTGFD);
 
                     if (!deltaToPairsMap.isEmpty()) {
-                        List<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(patternTreeNode, patternTreeNode.getPatternSupport(),
+                        List<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(copyOfNewPattern, patternTreeNode.getPatternSupport(),
                                 newPath, entities.size(), deltaToPairsMap, node);
                         result.get(1).addAll(generalTGFD);
                     }
                 }
             }
+            literalTree.getTree().add(currentLiteralLevel);
         }
 
         return result;
