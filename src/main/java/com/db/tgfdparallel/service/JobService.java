@@ -103,7 +103,7 @@ public class JobService {
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
     }
 
-    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, List<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
         Map<Integer, List<Job>> newJobsList = new HashMap<>();
         for (int index : assignedJobsBySnapshot.keySet()) {
             List<Job> newJobsAtIndex = new ArrayList<>();
@@ -115,7 +115,7 @@ public class JobService {
                     additionalJobs.add(newJob);
                 }
             }
-            // TODO: 可以考虑用set(jobID)，因为同样的jobID只消费一次
+            // TODO: Map<Integer, Set<Job>> assignedJobsBySnapshot 改成 Map<Integer, Map<Integer, Job>> assignedJobsBySnapshot
             assignedJobsBySnapshot.get(index).addAll(additionalJobs);
             newJobsList.put(index, newJobsAtIndex);
         }

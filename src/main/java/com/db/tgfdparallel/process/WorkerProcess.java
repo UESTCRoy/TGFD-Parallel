@@ -84,7 +84,7 @@ public class WorkerProcess {
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
         Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN = new HashMap<>();
-        Map<Integer, Set<Job>> assignedJobsBySnapshot = new HashMap<>();
+        Map<Integer, List<Job>> assignedJobsBySnapshot = new HashMap<>();
         init(patternTreeNodes, matchesPerTimestampsByPTN, entityURIsByPTN);
 
         // run first level matches
@@ -127,7 +127,6 @@ public class WorkerProcess {
                 }
 
                 Map<Integer, List<Job>> newJobsList = jobService.createNewJobsList(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
-
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
@@ -136,6 +135,7 @@ public class WorkerProcess {
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(entityURIsByPTN.get(newPattern),
                         vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
+                newPattern.setPatternSupport(newPatternSupport);
                 if (newPatternSupport < config.getPatternTheta()) {
                     newPattern.setPruned(true);
                     continue;
@@ -143,7 +143,7 @@ public class WorkerProcess {
 
                 // 计算新pattern的HSpawn
                 List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestampsByPTN.get(newPattern));
-                if (tgfds.size() == 2) {
+                if (tgfds.size() == 2 && level > 1) {
                     constantTGFDs.addAll(tgfds.get(0));
                     generalTGFDs.addAll(tgfds.get(1));
                 }
@@ -185,7 +185,6 @@ public class WorkerProcess {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
 
-//        for (int index = 0; index <= snapshotID; index++) {
         for (Job job : newJobsList.get(snapshotID)) {
             if (!verticesInGraph.contains(job.getCenterNode())) {
                 continue;
@@ -209,7 +208,6 @@ public class WorkerProcess {
             }
         }
     }
-//        }
 }
 
 

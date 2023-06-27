@@ -7,9 +7,7 @@ import org.jgrapht.Graph;
 import java.util.List;
 
 @Data
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Job {
-    @EqualsAndHashCode.Include
     private int ID;
     private int diameter;
     private Vertex centerNode;

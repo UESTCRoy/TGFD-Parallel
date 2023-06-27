@@ -76,7 +76,23 @@ public class TGFDService {
                     candidateDeltas.add(candidateDelta);
                 }
             } else if (rhsAttrValuesTimestampsSortedByFreq.size() > 1) {
-
+                // 判断delta是否有交集，没有则good拆分成positive，若有交集，则discard，后续升级成general
+                List<List<Integer>> listsToCheck = new ArrayList<>();
+                for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
+                    listsToCheck.add(entry.getValue());
+                }
+                if (checkNoOverlap(listsToCheck)) {
+                    // 拆分成多个positive
+                    for (List<Integer> timestamp : listsToCheck) {
+                        Pair candidateDelta = getMinMaxPair(timestamp);
+                        if (candidateDelta != null) {
+                            candidateDeltas.add(candidateDelta);
+                        }
+                    }
+                } else {
+                    // discard
+                    continue;
+                }
             }
 
             // Compute TGFD support
@@ -142,7 +158,7 @@ public class TGFDService {
 //                negativeTGFDs.add(new NegativeTGFD(entityEntry));
                 logger.info("Could not satisfy TGFD support threshold for entity: " + entityEntry.getKey());
             } else {
-                TGFD entityTGFD = new TGFD(newPattern, candidateTGFDdelta, newDependency, candidateTGFDsupport, patternNode.getPatternSupport());
+                TGFD entityTGFD = new TGFD(patternNode.getPattern(), candidateTGFDdelta, newDependency, candidateTGFDsupport, patternNode.getPatternSupport());
                 tgfds.add(entityTGFD);
 //                if (Util.hasMinimalityPruning) patternNode.addMinimalConstantDependency(constantPath);
             }
@@ -163,7 +179,7 @@ public class TGFDService {
         int currMin = 0;
         int currMax = config.getTimestamp() - 1;
         List<Pair> currSatisfyingAttrValues = new ArrayList<>();
-        for (Pair deltaPair: deltaToPairsMap.keySet().stream().sorted().collect(Collectors.toList())) {
+        for (Pair deltaPair : deltaToPairsMap.keySet().stream().sorted().collect(Collectors.toList())) {
             if (Math.max(currMin, deltaPair.getMin()) <= Math.min(currMax, deltaPair.getMax())) {
                 currMin = Math.max(currMin, deltaPair.getMin());
                 currMax = Math.min(currMax, deltaPair.getMax());
@@ -240,10 +256,13 @@ public class TGFDService {
 
     public int getTGFDKey(DataDependency dependency) {
         List<ConstantLiteral> collect = dependency.getX().stream().map(x -> (ConstantLiteral) x).sorted().collect(Collectors.toList());
+        ConstantLiteral literal = (ConstantLiteral) dependency.getY().get(0);
         StringBuilder sb = new StringBuilder();
+        // sb得加上rhs的literal的vertexType，因为可能会有settlement->country, settlement->village的情况
         for (ConstantLiteral data : collect) {
             sb.append(data.getVertexType()).append(data.getAttrName()).append(data.getAttrValue());
         }
+        sb.append(literal.getVertexType());
         return sb.hashCode();
     }
 
@@ -284,6 +303,23 @@ public class TGFDService {
         }
 
         return new Pair(minDistance, maxDistance);
+    }
+
+    private boolean checkNoOverlap(List<List<Integer>> listOfLists) {
+        int length = listOfLists.get(0).size();
+
+        for (int i = 0; i < length; i++) {
+            int existCount = 0;
+            for (List<Integer> list : listOfLists) {
+                if (list.get(i) != 0) {
+                    existCount++;
+                }
+            }
+            if (existCount > 1) {
+                return false;
+            }
+        }
+        return true;
     }
 
 }

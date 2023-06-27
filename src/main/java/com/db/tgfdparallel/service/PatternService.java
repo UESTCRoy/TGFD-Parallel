@@ -79,11 +79,11 @@ public class PatternService {
                                                 Map<String, PatternTreeNode> singlePatternTreeNodesMap,
                                                 Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                 Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
-                                                Map<Integer, Set<Job>> assignedJobsBySnapshot) {
+                                                Map<Integer, List<Job>> assignedJobsBySnapshot) {
         // 我们从singleNodeVertex开始，所以一开始的diameter设为0
         int diameter = 0;
         AtomicInteger jobID = new AtomicInteger(0);
-        assignedJobsBySnapshot.put(snapshotID, new HashSet<>());
+        assignedJobsBySnapshot.put(snapshotID, new ArrayList<>());
 
         for (Map.Entry<String, PatternTreeNode> entry : singlePatternTreeNodesMap.entrySet()) {
             String ptnType = entry.getKey();
@@ -202,6 +202,7 @@ public class PatternService {
 
         for (Map.Entry<String, Set<String>> entry : patternVerticesAttributes.entrySet()) {
             String vertexType = entry.getKey();
+            // TODO: 这里设置uri有什么用？
             if (considerURI) literals.add(new ConstantLiteral(vertexType, "uri", null));
 
             for (String attrName : entry.getValue()) {
@@ -268,8 +269,8 @@ public class PatternService {
                     continue;
                 }
 
-                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType)) {
-                    logger.info("Target vertex type has no active attributes. Skipping edge: " + edge);
+                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType) || !vertexTypesToActiveAttributesMap.containsKey(sourceVertexType)) {
+                    logger.info("Target and Source vertex type has no active attributes. Skipping edge: " + edge);
                     continue;
                 }
 
