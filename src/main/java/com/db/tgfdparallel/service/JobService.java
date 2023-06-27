@@ -115,7 +115,7 @@ public class JobService {
                     additionalJobs.add(newJob);
                 }
             }
-            // TODO: 可以考虑用set(jobID)，因为同样的jobID只消费一次
+            // TODO: Map<Integer, Set<Job>> assignedJobsBySnapshot 改成 Map<Integer, Map<Integer, Job>> assignedJobsBySnapshot
             assignedJobsBySnapshot.get(index).addAll(additionalJobs);
             newJobsList.put(index, newJobsAtIndex);
         }

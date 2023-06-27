@@ -202,6 +202,7 @@ public class PatternService {
 
         for (Map.Entry<String, Set<String>> entry : patternVerticesAttributes.entrySet()) {
             String vertexType = entry.getKey();
+            // TODO: 这里设置uri有什么用？
             if (considerURI) literals.add(new ConstantLiteral(vertexType, "uri", null));
 
             for (String attrName : entry.getValue()) {
@@ -268,8 +269,8 @@ public class PatternService {
                     continue;
                 }
 
-                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType)) {
-                    logger.info("Target vertex type has no active attributes. Skipping edge: " + edge);
+                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType) || !vertexTypesToActiveAttributesMap.containsKey(sourceVertexType)) {
+                    logger.info("Target and Source vertex type has no active attributes. Skipping edge: " + edge);
                     continue;
                 }
 

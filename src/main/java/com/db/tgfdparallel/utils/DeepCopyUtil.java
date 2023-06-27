@@ -16,9 +16,11 @@ public class DeepCopyUtil {
         kryo.register(DefaultDirectedGraph.class, new DefaultDirectedGraphSerializer());
         kryo.register(java.util.HashSet.class);
         kryo.register(java.util.HashMap.class);
+        kryo.register(java.util.ArrayList.class);
         kryo.register(Attribute.class);
         kryo.register(GraphLoader.class);
         kryo.register(VF2PatternGraph.class);
+        kryo.register(PatternTreeNode.class);
     }
 
     public static <T> T deepCopy(T original) {

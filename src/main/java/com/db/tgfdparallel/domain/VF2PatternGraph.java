@@ -10,7 +10,7 @@ import java.io.Serializable;
 @NoArgsConstructor
 public class VF2PatternGraph implements Serializable {
     private Graph<Vertex, RelationshipEdge> pattern;
-    private int diameter;
+//    private int diameter;
     private String centerVertexType;
     private Vertex centerVertex;
 
