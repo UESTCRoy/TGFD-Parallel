@@ -76,23 +76,24 @@ public class TGFDService {
                     candidateDeltas.add(candidateDelta);
                 }
             } else if (rhsAttrValuesTimestampsSortedByFreq.size() > 1) {
-                // 判断delta是否有交集，没有则good拆分成positive，若有交集，则discard，后续升级成general
-                List<List<Integer>> listsToCheck = new ArrayList<>();
-                for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
-                    listsToCheck.add(entry.getValue());
-                }
-                if (checkNoOverlap(listsToCheck)) {
-                    // 拆分成多个positive
-                    for (List<Integer> timestamp : listsToCheck) {
-                        Pair candidateDelta = getMinMaxPair(timestamp);
-                        if (candidateDelta != null) {
-                            candidateDeltas.add(candidateDelta);
-                        }
-                    }
-                } else {
-                    // discard
-                    continue;
-                }
+                continue;
+//                // 判断delta是否有交集，没有则good拆分成positive，若有交集，则discard，后续升级成general
+//                List<List<Integer>> listsToCheck = new ArrayList<>();
+//                for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
+//                    listsToCheck.add(entry.getValue());
+//                }
+//                if (checkNoOverlap(listsToCheck)) {
+//                    // 拆分成多个positive
+//                    for (List<Integer> timestamp : listsToCheck) {
+//                        Pair candidateDelta = getMinMaxPair(timestamp);
+//                        if (candidateDelta != null) {
+//                            candidateDeltas.add(candidateDelta);
+//                        }
+//                    }
+//                } else {
+//                    // discard
+//                    continue;
+//                }
             }
 
             // Compute TGFD support
@@ -134,7 +135,7 @@ public class TGFDService {
             }
 
             if (mostSupportedDelta == null) {
-                logger.error("Could not come up with mostSupportedDelta for entity: " + entityEntry.getKey());
+//                logger.error("Could not come up with mostSupportedDelta for entity: " + entityEntry.getKey());
                 continue;
             }
 
@@ -262,7 +263,7 @@ public class TGFDService {
         for (ConstantLiteral data : collect) {
             sb.append(data.getVertexType()).append(data.getAttrName()).append(data.getAttrValue());
         }
-        sb.append(literal.getVertexType());
+        sb.append(literal.getVertexType()).append(literal.getAttrName());
         return sb.hashCode();
     }
 
@@ -298,7 +299,7 @@ public class TGFDService {
         }
 
         if (minDistance > maxDistance) {
-            logger.info("Not enough timestamped matches found for entity.");
+//            logger.info("Not enough timestamped matches found for entity.");
             return null;
         }
 

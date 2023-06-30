@@ -100,7 +100,7 @@ public class WorkerProcess {
 
         List<TGFD> constantTGFDs = new ArrayList<>();
         List<TGFD> generalTGFDs = new ArrayList<>();
-        Map<Integer, Set<TGFD>> constantTGFDMap = new HashMap<>();
+        Map<Integer, List<TGFD>> constantTGFDMap = new HashMap<>();
 
         // Start VSpawn
         PatternTree patternTree = new PatternTree();
@@ -147,18 +147,19 @@ public class WorkerProcess {
                     constantTGFDs.addAll(tgfds.get(0));
                     generalTGFDs.addAll(tgfds.get(1));
                 }
-            }
-
-            if (level > 1) {
-                for (TGFD data : constantTGFDs) {
-                    int hashKey = tgfdService.getTGFDKey(data.getDependency());
-                    Set<TGFD> tgfdSet = constantTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>());
-                    tgfdSet.add(data);
-                }
+                logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
+                        level, newPattern.getPattern().getPattern(), constantTGFDs.size(), generalTGFDs.size());
             }
         }
 
+        for (TGFD data : constantTGFDs) {
+            int hashKey = tgfdService.getTGFDKey(data.getDependency());
+            List<TGFD> constantTGFDsList = constantTGFDMap.computeIfAbsent(hashKey, k -> new ArrayList<>());
+            constantTGFDsList.add(data);
+        }
+
         // Send data(Constant TGFDs) back to coordinator
+        logger.info("Send {} constant TGFDs to Coordinator", constantTGFDs.size());
         dataShipperService.uploadConstantTGFD(constantTGFDMap);
         logger.info(config.getNodeName() + " Done");
     }
@@ -178,9 +179,6 @@ public class WorkerProcess {
     public void runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
                             Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                             Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-
-        logger.info("Retrieving matches for all the joblets.");
-
         long startTime = System.currentTimeMillis();
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
@@ -200,10 +198,10 @@ public class WorkerProcess {
 
             if (results.isomorphismExists()) {
                 Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                logger.info("Start Matching at {}", LocalDateTime.now());
+//                logger.info("Start Matching at {}", LocalDateTime.now());
                 int numOfMatchesInTimestamp = patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
                         entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
-                logger.info("End Matching at {}", LocalDateTime.now());
+//                logger.info("End Matching at {}", LocalDateTime.now());
                 matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
             }
         }

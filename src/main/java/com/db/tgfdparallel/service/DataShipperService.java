@@ -1,5 +1,6 @@
 package com.db.tgfdparallel.service;
 
+import com.amazonaws.services.dynamodbv2.xspec.S;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.utils.FileUtil;
@@ -13,6 +14,8 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class DataShipperService {
@@ -21,6 +24,7 @@ public class DataShipperService {
     private final ActiveMQService activeMQService;
     private final HDFSService hdfsService;
     private final S3Service s3Service;
+    private final AtomicBoolean workersStatusChecker;
 
     @Autowired
     public DataShipperService(AppConfig config, ActiveMQService activeMQService, HDFSService hdfsService, S3Service s3Service) {
@@ -28,6 +32,7 @@ public class DataShipperService {
         this.activeMQService = activeMQService;
         this.hdfsService = hdfsService;
         this.s3Service = s3Service;
+        this.workersStatusChecker = new AtomicBoolean(true);
     }
 
     public Map<Integer, List<String>> dataToBeShippedAndSend(int batchSize, Map<Integer, List<RelationshipEdge>> edgesToBeShipped, Map<String, Integer> fragments) {
@@ -315,12 +320,12 @@ public class DataShipperService {
         return obj;
     }
 
-    public void uploadConstantTGFD(Map<Integer, Set<TGFD>> constantTGFDMap) {
+    public void uploadConstantTGFD(Map<Integer, List<TGFD>> constantTGFDMap) {
         String key = config.getNodeName() + "_constantTGFD";
         if (isAmazonMode()) {
             s3Service.uploadObject(config.getBucketName(), key, constantTGFDMap);
         } else {
-            hdfsService.uploadObject(config.getBucketName(), key, constantTGFDMap);
+            hdfsService.uploadObject(config.getHDFSPath(), key, constantTGFDMap);
         }
 
         activeMQService.connectProducer();
@@ -329,13 +334,19 @@ public class DataShipperService {
         activeMQService.closeProducer();
     }
 
-    // TODO: 运用像是worker status的功能
-    public Map<Integer, Set<TGFD>> downloadConstantTGFD() {
-        Map<Integer, Set<TGFD>> obj = null;
+    public Map<Integer, List<TGFD>> downloadConstantTGFD() {
+        Map<Integer, List<TGFD>> obj = new HashMap<>();
         try {
-            activeMQService.connectConsumer("constant-tgfd");
-            String msg = activeMQService.receive();
-            obj = (Map<Integer, Set<TGFD>>) downloadObject(msg);
+            List<String> constantTGFDsFile = activeMQService.receiveTGFDsFromWorker();
+            for (String fileName : constantTGFDsFile) {
+                Map<Integer, List<TGFD>> data = (Map<Integer, List<TGFD>>) downloadObject(fileName);
+                data.forEach((key, value) ->
+                        obj.merge(key, value, (oldValue, newValue) -> {
+                            oldValue.addAll(newValue);
+                            return oldValue;
+                        })
+                );
+            }
         } catch (IOException e) {
             logger.error("Error while downloading constant TGFD: " + e.getMessage(), e);
         } catch (ClassCastException e) {
