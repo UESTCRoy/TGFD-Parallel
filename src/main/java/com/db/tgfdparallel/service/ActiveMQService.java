@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -120,18 +122,44 @@ public class ActiveMQService {
     public void sendResult(int superStepNumber) {
         connectProducer();
         send("results" + superStepNumber, config.getNodeName() + "@" + superStepNumber);
-        logger.info("*WORKER*: SupersStep "+superStepNumber+" is done successfully");
+        logger.info("*WORKER*: SupersStep " + superStepNumber + " is done successfully");
         closeProducer();
     }
 
-//    public String receiveConstantTGFDMsg() {
-//        StringBuilder sb = new StringBuilder();
-//        workersStatusChecker.set(true);
-//        consumer.connect("");
-//
-//        while (workersStatusChecker.get()) {
-//
-//        }
-//    }
+    public List<String> receiveTGFDsFromWorker() {
+        List<String> results = new ArrayList<>();
+        try {
+            initializeWorkersStatus();
+            workersStatusChecker.set(true);
+            connectConsumer("constant-tgfd");
+            while (workersStatusChecker.get()) {
+                logger.info("*SETUP*: Listening for new messages to get workers' TGFDs");
+                String msg = consumer.receive();
+
+                if (msg != null) {
+                    String workerName = msg.split("_")[0];
+                    if (workersStatus.containsKey(workerName)) {
+                        logger.info("Constant TGFDs receive from {}", workerName);
+                        workersStatus.put(workerName, true);
+
+                        if (workersStatus.get(workerName)) {
+                            results.add(msg);
+                        }
+                    } else {
+                        logger.error("*SETUP*: Unable to find the worker name: '{}' in workers list. Please update the list in the Config file.", workerName);
+                    }
+                }
+
+                if (workersStatus.values().stream().allMatch(Boolean::booleanValue)) {
+                    logger.info("Received All Workers' TGFDs");
+                    workersStatusChecker.set(false);
+                }
+            }
+            closeConsumer();
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+        }
+        return results;
+    }
 }
 

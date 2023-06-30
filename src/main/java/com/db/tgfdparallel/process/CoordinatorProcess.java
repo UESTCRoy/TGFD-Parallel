@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class CoordinatorProcess {
@@ -86,30 +88,34 @@ public class CoordinatorProcess {
             logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
-        //TODO: 接收来自workers的constant TGFDs，然后处理, 这里可能得用list而不是set
-//        Map<Integer, Set<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD();
-//        for (Map.Entry<Integer, Set<TGFD>> entry : integerSetMap.entrySet()) {
-//            Set<TGFD> constantTGFDSets = entry.getValue();
-//            Integer hashKey = entry.getKey();
-//            // Negative
-//            if (constantTGFDSets.size() > 1) {
-//                int passCount = 0;
-//                double maxSupport = 0;
-//                for (TGFD data : constantTGFDSets) {
-//                    if (data.getTgfdSupport() >= config.getTgfdTheta()) {
-//                        passCount++;
-//                    }
-//                    maxSupport = Math.max(data.getTgfdSupport(), maxSupport);
-//                }
-//                if (maxSupport < config.getTgfdTheta()) {
-//                    integerSetMap.remove(hashKey);
-//                } else if (passCount > 1) {
-//                    // convert into general TGFD
-//                } else {
-//                    // only one TGFD pass the support
-//                }
-//            }
-//        }
+        Map<Integer, List<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD();
+        for (Map.Entry<Integer, List<TGFD>> entry : integerSetMap.entrySet()) {
+            List<TGFD> constantTGFDsList = entry.getValue();
+            Integer hashKey = entry.getKey();
+            // 如果constantTGFDsList size为1，positive情况，skip
+            // 如果constantTGFDsList size不为1，比较DataDependency的rhs的attrValue
+            //      1.如果attrValue一样，则更新Delta和entitySize，然后重新计算support
+            //          a. Delta无交集：各自计算support，然后与theta比较
+            //          b. Delta有交集：取交集部分
+            //      2.如果attrValue不一样，则视为negative处理
+            if (constantTGFDsList.size() == 1) {
+                continue;
+            } else {
+                Set<String> collect = constantTGFDsList.stream()
+                        .map(TGFD::getDependency)
+                        .map(x -> x.getY().get(0))
+                        .map(x -> (ConstantLiteral) x)
+                        .map(ConstantLiteral::getAttrValue)
+                        .collect(Collectors.toSet());
+                // 有不一样的人attrValue，integerSetMap
+                if (collect.size() != constantTGFDsList.size()) {
+                    integerSetMap.remove(hashKey);
+                } else {
+                    // TODO: 给TGFD加个entitySize属性
+                    // TODO: 给delta处理交集
+                }
+            }
+        }
     }
 
 //    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {

@@ -109,7 +109,7 @@ public class PatternService {
                                 Job job = new Job(currentJobID, vertex, ptn);
                                 assignedJobsBySnapshot.get(snapshotID).add(job);
                                 matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
-                                logger.info("Pattern: {} has {} matches", ptn.getPattern().getCenterVertex(), numOfMatchesInTimestamp);
+//                                logger.info("Pattern: {} has {} matches", ptn.getPattern().getCenterVertex(), numOfMatchesInTimestamp);
                             }
                         }
                     });
