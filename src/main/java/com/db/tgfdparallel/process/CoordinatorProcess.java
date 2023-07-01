@@ -3,6 +3,7 @@ package com.db.tgfdparallel.process;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
+import com.db.tgfdparallel.utils.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +89,9 @@ public class CoordinatorProcess {
             logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
+        int numOfPositiveTGFDs = 0;
+        int numOfNegativeTGFDs = 0;
+        int numOfToBeDone = 0;
         Map<Integer, List<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD();
         for (Map.Entry<Integer, List<TGFD>> entry : integerSetMap.entrySet()) {
             List<TGFD> constantTGFDsList = entry.getValue();
@@ -99,6 +103,7 @@ public class CoordinatorProcess {
             //          b. Delta有交集：取交集部分
             //      2.如果attrValue不一样，则视为negative处理
             if (constantTGFDsList.size() == 1) {
+                numOfPositiveTGFDs++;
                 continue;
             } else {
                 Set<String> collect = constantTGFDsList.stream()
@@ -110,12 +115,16 @@ public class CoordinatorProcess {
                 // 有不一样的人attrValue，integerSetMap
                 if (collect.size() != constantTGFDsList.size()) {
                     integerSetMap.remove(hashKey);
+                    numOfNegativeTGFDs++;
                 } else {
                     // TODO: 给TGFD加个entitySize属性
                     // TODO: 给delta处理交集
+                    numOfToBeDone++;
                 }
             }
         }
+        FileUtil.saveConstantTGFDsToFile(integerSetMap, "Constant-TGFD");
+        logger.info("There are {} Positive TGFDs and {} Negative TGFDs and {} to be done!", numOfPositiveTGFDs, numOfNegativeTGFDs, numOfToBeDone);
     }
 
 //    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {

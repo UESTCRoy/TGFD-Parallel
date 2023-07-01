@@ -346,6 +346,7 @@ public class DataShipperService {
                             return oldValue;
                         })
                 );
+                logger.info("Got {} constant TGFD from {}", data.size(), fileName);
             }
         } catch (IOException e) {
             logger.error("Error while downloading constant TGFD: " + e.getMessage(), e);

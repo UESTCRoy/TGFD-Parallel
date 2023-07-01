@@ -2,12 +2,11 @@ package com.db.tgfdparallel.utils;
 
 import com.db.tgfdparallel.domain.RelationshipEdge;
 import com.db.tgfdparallel.domain.Vertex;
-import com.esotericsoftware.kryo.Serializer;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.kryo5.Kryo;
+import com.esotericsoftware.kryo.kryo5.Serializer;
+import com.esotericsoftware.kryo.kryo5.io.Input;
+import com.esotericsoftware.kryo.kryo5.io.Output;
 import org.jgrapht.graph.DefaultDirectedGraph;
-
-import com.esotericsoftware.kryo.Kryo;
 
 import java.util.HashSet;
 import java.util.Set;
