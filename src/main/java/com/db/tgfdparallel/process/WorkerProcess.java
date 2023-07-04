@@ -104,6 +104,7 @@ public class WorkerProcess {
         List<TGFD> constantTGFDs = new ArrayList<>();
         List<TGFD> generalTGFDs = new ArrayList<>();
         Map<Integer, List<TGFD>> constantTGFDMap = new HashMap<>();
+        Map<Integer, List<TGFD>> generalTGFDMap = new HashMap<>();
 
         // Start VSpawn
         PatternTree patternTree = new PatternTree();
@@ -155,15 +156,21 @@ public class WorkerProcess {
             }
         }
 
+        // 生成constant与general的TGFD Map，返回给Coordinator汇总
         for (TGFD data : constantTGFDs) {
-            int hashKey = tgfdService.getTGFDKey(data.getDependency());
+            int hashKey = tgfdService.getConstantTGFDKey(data.getDependency());
             List<TGFD> constantTGFDsList = constantTGFDMap.computeIfAbsent(hashKey, k -> new ArrayList<>());
             constantTGFDsList.add(data);
         }
+        for (TGFD data : generalTGFDs) {
+            int hashKey = tgfdService.getGeneralTGFDKey(data.getDependency());
+            List<TGFD> generalTGFDsList = generalTGFDMap.computeIfAbsent(hashKey, k -> new ArrayList<>());
+            generalTGFDsList.add(data);
+        }
 
         // Send data(Constant TGFDs) back to coordinator
-        logger.info("Send {} constant TGFDs to Coordinator", constantTGFDs.size());
-        dataShipperService.uploadConstantTGFD(constantTGFDMap);
+        logger.info("Send {} constant and {} general TGFDs to Coordinator", constantTGFDs.size(), generalTGFDs.size());
+        dataShipperService.uploadTGFD(constantTGFDMap, generalTGFDMap);
         logger.info(config.getNodeName() + " Done");
     }
 

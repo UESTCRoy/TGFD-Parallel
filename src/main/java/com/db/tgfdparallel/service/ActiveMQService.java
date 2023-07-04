@@ -126,12 +126,14 @@ public class ActiveMQService {
         closeProducer();
     }
 
-    public List<String> receiveTGFDsFromWorker() {
+    public List<String> receiveTGFDsFromWorker(String type) {
         List<String> results = new ArrayList<>();
         try {
             initializeWorkersStatus();
             workersStatusChecker.set(true);
-            connectConsumer("constant-tgfd");
+            StringBuilder sb = new StringBuilder();
+            String queueName = sb.append(type).append("-tgfd").toString();
+            connectConsumer(queueName);
             while (workersStatusChecker.get()) {
                 logger.info("*SETUP*: Listening for new messages to get workers' TGFDs");
                 String msg = consumer.receive();
@@ -139,7 +141,7 @@ public class ActiveMQService {
                 if (msg != null) {
                     String workerName = msg.split("_")[0];
                     if (workersStatus.containsKey(workerName)) {
-                        logger.info("Constant TGFDs receive from {}", workerName);
+                        logger.info("{} TGFDs receive from {}", type, workerName);
                         workersStatus.put(workerName, true);
 
                         if (workersStatus.get(workerName)) {
