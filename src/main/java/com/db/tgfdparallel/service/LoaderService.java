@@ -13,10 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class LoaderService {
@@ -58,17 +55,15 @@ public class LoaderService {
         return loader;
     }
 
-    public GraphLoader loadDBPedia(Model model) {
+    public GraphLoader loadDBPedia(Model model, Set<String> vertexTypes) {
         Map<String, Vertex> nodeMap = new HashMap<>();
         Graph<Vertex, RelationshipEdge> dataGraph = new DefaultDirectedGraph<>(RelationshipEdge.class);
 
-        Set<String> types = new HashSet<>();
-
-        loadNodeMap(model, nodeMap, dataGraph, types);
+        loadNodeMap(model, nodeMap, dataGraph, vertexTypes);
         loadDataGraph(model, nodeMap, dataGraph);
 
         VF2DataGraph graph = new VF2DataGraph(dataGraph, nodeMap);
-        return new GraphLoader(graph, types);
+        return new GraphLoader(graph);
     }
 
     public void loadNodeMap(Model model, Map<String, Vertex> nodeMap, Graph<Vertex, RelationshipEdge> dataGraph, Set<String> types) {
@@ -87,6 +82,10 @@ public class LoaderService {
                 if (nodeType.trim().length() == 0) {
                     continue;
                 }
+                // 仅过滤histogram里的types
+                if (types.size() != 0 && !types.contains(nodeType)) {
+                    continue;
+                }
 
                 Vertex v = nodeMap.getOrDefault(nodeURI, null);
                 if (v == null) {
@@ -96,7 +95,6 @@ public class LoaderService {
                 } else {
                     v.getTypes().add(nodeType);
                 }
-                types.add(nodeType);
             }
             logger.info("Done. Number of Types: " + nodeMap.size());
         } catch (Exception e) {

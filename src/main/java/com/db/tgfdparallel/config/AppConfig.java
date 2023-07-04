@@ -30,6 +30,9 @@ public class AppConfig {
     @Value("${dataPath}")
     private String dataPath;
 
+    @Value("#{'${allDataPath}'.split(',')}")
+    private List<String> allDataPath;
+
     @Value("${timestamp}")
     private int timestamp;
 

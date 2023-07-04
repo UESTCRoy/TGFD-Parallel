@@ -39,10 +39,15 @@ public class HistogramService {
             readGraphInfo(nextDataGraph.getGraph(), data);
         }
 
-        // TODO: finish the following method
-        ProcessedHistogramData histogramData = performingRecordKeeping(data);
+        return performingRecordKeeping(data);
+    }
 
-        return histogramData;
+    public ProcessedHistogramData computeHistogramAllSnapshot(List<Graph<Vertex, RelationshipEdge>> allSnapshotGraph) {
+        HistogramData data = new HistogramData();
+        for (Graph<Vertex, RelationshipEdge> graph : allSnapshotGraph) {
+            readGraphInfo(graph, data);
+        }
+        return performingRecordKeeping(data);
     }
 
     public void readGraphInfo(Graph<Vertex, RelationshipEdge> graph, HistogramData data) {

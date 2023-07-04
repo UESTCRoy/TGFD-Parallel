@@ -3,6 +3,8 @@ package com.db.tgfdparallel.process;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
+import com.db.tgfdparallel.utils.FileUtil;
+import org.jgrapht.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,18 +45,21 @@ public class CoordinatorProcess {
         activeMQService.initializeWorkersStatus();
         activeMQService.statusCheck();
 
-        // Generate all the changes for histogram computation and send to all workers
-        List<List<Change>> changesData = changeService.changeGenerator();
-        logger.info("Generating change files for {} snapshots and got {} change files", config.getTimestamp(), changesData.size());
-
         // Generate histogram and send the histogram data to all workers
-        String dataPath = config.getDataPath();
-        logger.info("Load the first snapshot from the data path: {}", dataPath);
-        GraphLoader firstLoader = graphService.loadFirstSnapshot(dataPath);
-        // I use deep copy: kryo here
-        ProcessedHistogramData histogramData = histogramService.computeHistogram(firstLoader.getGraph(), changesData);
+        List<String> allDataPath = config.getAllDataPath();
+        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshot(allDataPath)
+                .stream()
+                .map(x -> x.getGraph().getGraph())
+                .collect(Collectors.toList());
+
+        ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
         dataShipperService.sendHistogramData(histogramData);
+
+        Set<String> vertexTypes = histogramData.getSortedVertexHistogram()
+                .stream()
+                .map(FrequencyStatistics::getType)
+                .collect(Collectors.toSet());
 
         // First Level initialization of the pattern tree
         PatternTree patternTree = new PatternTree();
@@ -67,15 +72,19 @@ public class CoordinatorProcess {
         activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
 
         // Initialize the graph from the split graph, String (VertexURI) -> Integer (FragmentID)
-        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(config.getSplitGraphPath());
+        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(config.getSplitGraphPath(), vertexTypes);
 
         // Define jobs and assign them to the workers
-        Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstLoader.getGraph().getGraph(), fragmentsForTheInitialLoad, patternTreeNodes);
+        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(allDataPath.get(0), vertexTypes).getGraph().getGraph();
+        Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
 
         // Send the edge data to the workers
         Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, edgesToBeShipped, fragmentsForTheInitialLoad);
         dataShipperService.edgeShipper(listOfFiles);
 
+        // Generate all the changes for histogram computation and send to all workers
+        List<List<Change>> changesData = changeService.changeGenerator();
+        logger.info("Generating change files for {} snapshots and got {} change files", config.getTimestamp(), changesData.size());
         // Send the changes to the workers
         // 不搞异步通过changeFile生成new graph，与worker确认巴拉巴拉，我们一次性把change上传，然后让worker逐步生成new graph
         StringBuilder sb = new StringBuilder("#change");
@@ -88,6 +97,9 @@ public class CoordinatorProcess {
             logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
+        int numOfPositiveTGFDs = 0;
+        int numOfNegativeTGFDs = 0;
+        int numOfToBeDone = 0;
         Map<Integer, List<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD();
         for (Map.Entry<Integer, List<TGFD>> entry : integerSetMap.entrySet()) {
             List<TGFD> constantTGFDsList = entry.getValue();
@@ -99,6 +111,7 @@ public class CoordinatorProcess {
             //          b. Delta有交集：取交集部分
             //      2.如果attrValue不一样，则视为negative处理
             if (constantTGFDsList.size() == 1) {
+                numOfPositiveTGFDs++;
                 continue;
             } else {
                 Set<String> collect = constantTGFDsList.stream()
@@ -110,23 +123,16 @@ public class CoordinatorProcess {
                 // 有不一样的人attrValue，integerSetMap
                 if (collect.size() != constantTGFDsList.size()) {
                     integerSetMap.remove(hashKey);
+                    numOfNegativeTGFDs++;
                 } else {
                     // TODO: 给TGFD加个entitySize属性
                     // TODO: 给delta处理交集
+                    numOfToBeDone++;
                 }
             }
         }
+        FileUtil.saveConstantTGFDsToFile(integerSetMap, "Constant-TGFD");
+        logger.info("There are {} Positive TGFDs and {} Negative TGFDs and {} to be done!", numOfPositiveTGFDs, numOfNegativeTGFDs, numOfToBeDone);
     }
-
-//    public void changeShipperAndWaitResult(Map<Integer, String> changesToBeSentToAllWorkers) {
-//        AtomicInteger superstep = new AtomicInteger(1);
-//        AtomicBoolean resultGetter = new AtomicBoolean(false);
-//
-//        CompletableFuture<Void> changeShipperFuture = asyncService.changeShipper(changesToBeSentToAllWorkers, superstep, resultGetter);
-//        CompletableFuture<Void> resultsGetterFuture = asyncService.resultsGetter(superstep, resultGetter);
-//
-//        // Wait for both methods to complete
-//        CompletableFuture.allOf(changeShipperFuture, resultsGetterFuture).join();
-//    }
 
 }

@@ -54,7 +54,10 @@ public class WorkerProcess {
         logger.info("Received Histogram From Coordinator, {} ms", histogramEndTime - histogramStartTime);
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
         List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram().stream().map(FrequencyStatistics::getType).collect(Collectors.toList());
-        Map<String, Integer> vertexHistogram = histogramData.getVertexHistogram();
+        Map<String, Integer> vertexHistogram = histogramData.getSortedVertexHistogram().stream()
+                .collect(Collectors.toMap(FrequencyStatistics::getType, FrequencyStatistics::getFrequency));
+        Set<String> vertexTypes = histogramData.getSortedVertexHistogram().stream()
+                .map(FrequencyStatistics::getType).collect(Collectors.toSet());
 
         // Receive the pattern tree from the coordinator
         long singlePatternStartTime = System.currentTimeMillis();
@@ -63,7 +66,7 @@ public class WorkerProcess {
         logger.info("Received singlePatternTreeNodes From Coordinator, {} ms", singlePatternEndTime - singlePatternStartTime);
 
         // Load the first snapshot
-        GraphLoader graphLoader = graphService.loadFirstSnapshot(config.getDataPath());
+        GraphLoader graphLoader = graphService.loadFirstSnapshot(config.getDataPath(), vertexTypes);
         logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
                 graphLoader.getGraph().getGraph().edgeSet().size(),
                 graphLoader.getGraph().getGraph().vertexSet().size());

@@ -11,7 +11,7 @@ import java.util.Set;
 @AllArgsConstructor
 public class GraphLoader {
     private VF2DataGraph graph;
-    private Set<String> types;
+//    private Set<String> types;
 //    private int graphSize;
 //    private Set<String> validTypes;
 //    private Set<String> validAttributes;
