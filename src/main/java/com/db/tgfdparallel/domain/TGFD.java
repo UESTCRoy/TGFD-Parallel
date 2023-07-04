@@ -14,6 +14,7 @@ public class TGFD implements Serializable {
     private DataDependency dependency;
     private Double tgfdSupport;
     private Double patternSupport;
+    private int level;
 
     @Override
     public String toString() {
@@ -22,6 +23,7 @@ public class TGFD implements Serializable {
                 ", delta=" + delta +
                 ", dependency=" + dependency +
                 ", tgfdSupport=" + tgfdSupport +
+                ", level=" + level +
                 '}';
     }
 }

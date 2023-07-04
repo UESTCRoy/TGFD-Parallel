@@ -320,25 +320,29 @@ public class DataShipperService {
         return obj;
     }
 
-    public void uploadConstantTGFD(Map<Integer, List<TGFD>> constantTGFDMap) {
-        String key = config.getNodeName() + "_constantTGFD";
+    public void uploadTGFD(Map<Integer, List<TGFD>> constantTGFDMap, Map<Integer, List<TGFD>> generalTGFDMap) {
+        String constantKey = config.getNodeName() + "_constantTGFD";
+        String generalKey = config.getNodeName() + "_generalTGFD";
         if (isAmazonMode()) {
-            s3Service.uploadObject(config.getBucketName(), key, constantTGFDMap);
+            s3Service.uploadObject(config.getBucketName(), constantKey, constantTGFDMap);
+            s3Service.uploadObject(config.getBucketName(), generalKey, generalTGFDMap);
         } else {
-            hdfsService.uploadObject(config.getHDFSPath(), key, constantTGFDMap);
+            hdfsService.uploadObject(config.getHDFSPath(), constantKey, constantTGFDMap);
+            hdfsService.uploadObject(config.getHDFSPath(), generalKey, generalTGFDMap);
         }
 
         activeMQService.connectProducer();
-        activeMQService.send("constant-tgfd", key);
-        logger.info("Worker " + config.getNodeName() + "send constant tgfds back to coordinator successfully!");
+        activeMQService.send("constant-tgfd", constantKey);
+        activeMQService.send("general-tgfd", generalKey);
+        logger.info("Worker " + config.getNodeName() + "send TGFDs back to coordinator successfully!");
         activeMQService.closeProducer();
     }
 
-    public Map<Integer, List<TGFD>> downloadConstantTGFD() {
+    public Map<Integer, List<TGFD>> downloadConstantTGFD(String type) {
         Map<Integer, List<TGFD>> obj = new HashMap<>();
         try {
-            List<String> constantTGFDsFile = activeMQService.receiveTGFDsFromWorker();
-            for (String fileName : constantTGFDsFile) {
+            List<String> TGFDsFile = activeMQService.receiveTGFDsFromWorker(type);
+            for (String fileName : TGFDsFile) {
                 Map<Integer, List<TGFD>> data = (Map<Integer, List<TGFD>>) downloadObject(fileName);
                 data.forEach((key, value) ->
                         obj.merge(key, value, (oldValue, newValue) -> {
@@ -346,10 +350,10 @@ public class DataShipperService {
                             return oldValue;
                         })
                 );
-                logger.info("Got {} constant TGFD from {}", data.size(), fileName);
+                logger.info("Got {} {} TGFDs from {}", data.size(), type, fileName);
             }
         } catch (IOException e) {
-            logger.error("Error while downloading constant TGFD: " + e.getMessage(), e);
+            logger.error("Error while downloading {} TGFD: " + e.getMessage(), type, e);
         } catch (ClassCastException e) {
             logger.error("Error while casting downloaded object to Map<Integer, Set<TGFD>>: " + e.getMessage(), e);
         }

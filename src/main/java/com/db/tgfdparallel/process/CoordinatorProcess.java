@@ -100,7 +100,8 @@ public class CoordinatorProcess {
         int numOfPositiveTGFDs = 0;
         int numOfNegativeTGFDs = 0;
         int numOfToBeDone = 0;
-        Map<Integer, List<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD();
+        Map<Integer, List<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD("constant");
+        Map<Integer, List<TGFD>> generalTGFDMap = dataShipperService.downloadConstantTGFD("general");
         for (Map.Entry<Integer, List<TGFD>> entry : integerSetMap.entrySet()) {
             List<TGFD> constantTGFDsList = entry.getValue();
             Integer hashKey = entry.getKey();
@@ -131,7 +132,14 @@ public class CoordinatorProcess {
                 }
             }
         }
+        for (Map.Entry<Integer, List<TGFD>> entry: generalTGFDMap.entrySet()) {
+            List<TGFD> value = entry.getValue();
+            if (value.size() > 1) {
+                logger.info("We found General TGFDs need to be fixed!!!");
+            }
+        }
         FileUtil.saveConstantTGFDsToFile(integerSetMap, "Constant-TGFD");
+        FileUtil.saveConstantTGFDsToFile(integerSetMap, "General-TGFD");
         logger.info("There are {} Positive TGFDs and {} Negative TGFDs and {} to be done!", numOfPositiveTGFDs, numOfNegativeTGFDs, numOfToBeDone);
     }
 

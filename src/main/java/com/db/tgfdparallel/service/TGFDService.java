@@ -146,6 +146,8 @@ public class TGFDService {
             candidateTGFDdelta = new Delta(Period.ofYears(minDistance), Period.ofYears(maxDistance), Duration.ofDays(365));
             constantPath.setDelta(candidateTGFDdelta);
 
+            int level = patternNode.getPattern().getPattern().vertexSet().size();
+
             // TODO: Ensures we don't expand constant TGFDs from previous iterations
 //            boolean isNotMinimal = false;
 //            if (Util.hasMinimalityPruning && constantPath.isSuperSetOfPathAndSubsetOfDelta(patternNode.getAllMinimalConstantDependenciesOnThisPath())) {
@@ -159,7 +161,7 @@ public class TGFDService {
 //                negativeTGFDs.add(new NegativeTGFD(entityEntry));
                 logger.info("Could not satisfy TGFD support threshold for entity: " + entityEntry.getKey());
             } else {
-                TGFD entityTGFD = new TGFD(patternNode.getPattern(), candidateTGFDdelta, newDependency, candidateTGFDsupport, patternNode.getPatternSupport());
+                TGFD entityTGFD = new TGFD(patternNode.getPattern(), candidateTGFDdelta, newDependency, candidateTGFDsupport, patternNode.getPatternSupport(), level);
                 tgfds.add(entityTGFD);
 //                if (Util.hasMinimalityPruning) patternNode.addMinimalConstantDependency(constantPath);
             }
@@ -237,10 +239,12 @@ public class TGFDService {
             generalDependency.getY().add(varY);
             literalPath.getLhs().stream().map(x -> new VariableLiteral(x.getVertexType(), x.getAttrName())).forEach(generalDependency.getX()::add);
 
+            int level = patternTreeNode.getPattern().getPattern().vertexSet().size();
+
             if (tgfdSupport < config.getTgfdTheta()) {
                 logger.info("Support for candidate general TGFD is below support threshold");
             } else {
-                TGFD tgfd = new TGFD(patternTreeNode.getPattern(), delta, generalDependency, tgfdSupport, patternSupport);
+                TGFD tgfd = new TGFD(patternTreeNode.getPattern(), delta, generalDependency, tgfdSupport, patternSupport, level);
                 tgfds.add(tgfd);
             }
         });
@@ -255,13 +259,24 @@ public class TGFDService {
         return numerator / denominator;
     }
 
-    public int getTGFDKey(DataDependency dependency) {
+    public int getConstantTGFDKey(DataDependency dependency) {
         List<ConstantLiteral> collect = dependency.getX().stream().map(x -> (ConstantLiteral) x).sorted().collect(Collectors.toList());
         ConstantLiteral literal = (ConstantLiteral) dependency.getY().get(0);
         StringBuilder sb = new StringBuilder();
         // sb得加上rhs的literal的vertexType，因为可能会有settlement->country, settlement->village的情况
         for (ConstantLiteral data : collect) {
             sb.append(data.getVertexType()).append(data.getAttrName()).append(data.getAttrValue());
+        }
+        sb.append(literal.getVertexType()).append(literal.getAttrName());
+        return sb.hashCode();
+    }
+
+    public int getGeneralTGFDKey(DataDependency dependency) {
+        List<VariableLiteral> collect = dependency.getX().stream().map(x -> (VariableLiteral) x).sorted().collect(Collectors.toList());
+        VariableLiteral literal = (VariableLiteral) dependency.getY().get(0);
+        StringBuilder sb = new StringBuilder();
+        for (VariableLiteral data : collect) {
+            sb.append(data.getVertexType()).append(data.getAttrName());
         }
         sb.append(literal.getVertexType()).append(literal.getAttrName());
         return sb.hashCode();
