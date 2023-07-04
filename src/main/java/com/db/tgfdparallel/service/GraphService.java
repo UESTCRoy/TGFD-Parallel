@@ -34,23 +34,18 @@ public class GraphService {
         this.dataShipperService = dataShipperService;
     }
 
-    public Map<String, Integer> initializeFromSplitGraph(List<String> paths) {
+    public Map<String, Integer> initializeFromSplitGraph(List<String> paths, Set<String> vertexTypes) {
         Map<String, Integer> VertexFragment = new HashMap<>();
 
         for (int i = 0; i < paths.size(); i++) {
             String path = paths.get(i);
             logger.info("Loading graph from " + path);
-
-            if (!path.toLowerCase().endsWith(".ttl") && !path.toLowerCase().endsWith(".nt")) {
-                logger.info("File format not supported");
-                continue;
-            }
             Model dataModel = RDFDataMgr.loadModel(path);
 
             GraphLoader graphLoader = new GraphLoader();
             switch (config.getDataset()) {
                 case "dbpedia":
-                    graphLoader = loaderService.loadDBPedia(dataModel);
+                    graphLoader = loaderService.loadDBPedia(dataModel, vertexTypes);
                 case "imdb":
 //                    loader = new IMDBLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
                 case "synthetic":
@@ -65,13 +60,13 @@ public class GraphService {
         return VertexFragment;
     }
 
-    public GraphLoader loadFirstSnapshot(String path) {
+    public GraphLoader loadFirstSnapshot(String path, Set<String> vertexTypes) {
         GraphLoader loader = new GraphLoader();
 
         Model dataModel = RDFDataMgr.loadModel(path);
         switch (config.getDataset()) {
             case "dbpedia":
-                loader = loaderService.loadDBPedia(dataModel);
+                loader = loaderService.loadDBPedia(dataModel, vertexTypes);
             case "imdb":
 //                    loader = new IMDBLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
             case "synthetic":
@@ -79,6 +74,24 @@ public class GraphService {
         }
 
         return loader;
+    }
+
+    public List<GraphLoader> loadAllSnapshot(List<String> paths) {
+        List<GraphLoader> result = new ArrayList<>();
+        for (String path : paths) {
+            GraphLoader loader = new GraphLoader();
+            Model dataModel = RDFDataMgr.loadModel(path);
+            switch (config.getDataset()) {
+                case "dbpedia":
+                    loader = loaderService.loadDBPedia(dataModel, new HashSet<>());
+                case "imdb":
+//                    loader = new IMDBLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
+                case "synthetic":
+//                    loader = new SyntheticLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
+            }
+            result.add(loader);
+        }
+        return result;
     }
 
     /**
