@@ -21,38 +21,50 @@ public class LoaderService {
     private static final Logger logger = LoggerFactory.getLogger(LoaderService.class);
     private static final String TYPE_PREDICATE_URI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 
-    public GraphLoader loadIMDBGraph(Model model) {
-        GraphLoader loader = new GraphLoader();
-        Set<String> types = new HashSet<>();
-        VF2DataGraph graph = new VF2DataGraph();
+    public GraphLoader loadIMDB(Model model) {
+        Map<String, Vertex> nodeMap = new HashMap<>();
+        Graph<Vertex, RelationshipEdge> dataGraph = new DefaultDirectedGraph<>(RelationshipEdge.class);
+
         try {
             StmtIterator dataTriples = model.listStatements();
-
             while (dataTriples.hasNext()) {
                 Statement stmt = dataTriples.nextStatement();
-                String subjectNodeURL = stmt.getSubject().getURI().toLowerCase();
-                if (subjectNodeURL.length() > 16) {
-                    subjectNodeURL = subjectNodeURL.substring(16);
-                }
-
-                String[] temp = subjectNodeURL.split("/");
-                if (temp.length != 2) {
-                    logger.error("Error: " + subjectNodeURL);
+                String[] temp = processURI(stmt);
+                if (temp == null) {
                     continue;
                 }
+
                 String subjectType = temp[0];
                 String subjectID = temp[1];
 
-                // TODO: Ignore the node if the type is not in the validTypes and optimizedLoadingBasedOnTGFD is true
+                Vertex subjectVertex = getOrCreateVertex(subjectID, subjectType, nodeMap, dataGraph);
 
-                types.add(subjectType);
+                String predicate = stmt.getPredicate().getLocalName().toLowerCase();
+                RDFNode object = stmt.getObject();
+                String objectNodeURI;
 
+                if (object.isLiteral()) {
+                    objectNodeURI = object.asLiteral().getString().toLowerCase();
+                    subjectVertex.getAttributes().add(new Attribute(predicate, objectNodeURI));
+                } else {
+                    temp = processURI(stmt);
+                    if (temp == null) {
+                        continue;
+                    }
 
+                    String objectType = temp[0];
+                    String objectID = temp[1];
+                    Vertex objectVertex = getOrCreateVertex(objectID, objectType, nodeMap, dataGraph);
+                    boolean edgeAdded = dataGraph.addEdge(subjectVertex, objectVertex, new RelationshipEdge(predicate));
+                }
             }
+            logger.info("Done. Nodes: {}, Edges: {}", nodeMap.size(), dataGraph.edgeSet().size());
         } catch (Exception e) {
             logger.error(e.getMessage());
         }
-        return loader;
+
+        VF2DataGraph graph = new VF2DataGraph(dataGraph, nodeMap);
+        return new GraphLoader(graph);
     }
 
     public GraphLoader loadDBPedia(Model model, Set<String> vertexTypes) {
@@ -158,6 +170,27 @@ public class LoaderService {
             objectNodeURI = object.toString().substring(object.toString().lastIndexOf("/") + 1).toLowerCase();
         }
         return objectNodeURI;
+    }
+
+    private String[] processURI(Statement stmt) {
+        String[] temp = stmt.getSubject().getURI().toLowerCase().substring(16).split("/");
+        if (temp.length != 2) {
+            logger.error("Error: Invalid URI format: " + stmt.getSubject().getURI());
+            return null;
+        }
+        return temp;
+    }
+
+    private Vertex getOrCreateVertex(String id, String type, Map<String, Vertex> nodeMap, Graph<Vertex, RelationshipEdge> dataGraph) {
+        Vertex vertex = nodeMap.getOrDefault(id, null);
+        if (vertex == null) {
+            vertex = new Vertex(id, type);
+            dataGraph.addVertex(vertex);
+            nodeMap.put(id, vertex);
+        } else {
+            vertex.getTypes().add(type);
+        }
+        return vertex;
     }
 
 }

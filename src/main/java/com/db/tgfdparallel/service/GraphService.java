@@ -47,7 +47,7 @@ public class GraphService {
                 case "dbpedia":
                     graphLoader = loaderService.loadDBPedia(dataModel, vertexTypes);
                 case "imdb":
-//                    loader = new IMDBLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
+                    graphLoader = loaderService.loadIMDB(dataModel);
                 case "synthetic":
 //                    loader = new SyntheticLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
             }
@@ -68,7 +68,7 @@ public class GraphService {
             case "dbpedia":
                 loader = loaderService.loadDBPedia(dataModel, vertexTypes);
             case "imdb":
-//                    loader = new IMDBLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
+                loader = loaderService.loadIMDB(dataModel);
             case "synthetic":
 //                    loader = new SyntheticLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
         }
@@ -85,7 +85,7 @@ public class GraphService {
                 case "dbpedia":
                     loader = loaderService.loadDBPedia(dataModel, new HashSet<>());
                 case "imdb":
-//                    loader = new IMDBLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
+                    loader = loaderService.loadIMDB(dataModel);
                 case "synthetic":
 //                    loader = new SyntheticLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
             }
