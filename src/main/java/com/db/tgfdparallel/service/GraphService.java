@@ -46,8 +46,10 @@ public class GraphService {
             switch (config.getDataset()) {
                 case "dbpedia":
                     graphLoader = loaderService.loadDBPedia(dataModel, vertexTypes);
+                    break;
                 case "imdb":
                     graphLoader = loaderService.loadIMDB(dataModel);
+                    break;
                 case "synthetic":
 //                    loader = new SyntheticLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
             }
@@ -67,8 +69,10 @@ public class GraphService {
         switch (config.getDataset()) {
             case "dbpedia":
                 loader = loaderService.loadDBPedia(dataModel, vertexTypes);
+                break;
             case "imdb":
                 loader = loaderService.loadIMDB(dataModel);
+                break;
             case "synthetic":
 //                    loader = new SyntheticLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
         }
@@ -84,8 +88,10 @@ public class GraphService {
             switch (config.getDataset()) {
                 case "dbpedia":
                     loader = loaderService.loadDBPedia(dataModel, new HashSet<>());
+                    break;
                 case "imdb":
                     loader = loaderService.loadIMDB(dataModel);
+                    break;
                 case "synthetic":
 //                    loader = new SyntheticLoader(new ArrayList<>(), Collections.singletonList(dataModel), Collections.singletonList(dataModel));
             }
