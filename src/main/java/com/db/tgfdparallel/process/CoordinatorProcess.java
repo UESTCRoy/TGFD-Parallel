@@ -52,6 +52,11 @@ public class CoordinatorProcess {
                 .map(x -> x.getGraph().getGraph())
                 .collect(Collectors.toList());
 
+        for (int i = 0; i < graphLoaders.size(); i++) {
+            Graph<Vertex, RelationshipEdge> graph = graphLoaders.get(i);
+            logger.info("At timestamp {} we got {} vertex and {} edges", i, graph.vertexSet().size(), graph.edgeSet().size());
+        }
+
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
         dataShipperService.sendHistogramData(histogramData);
@@ -60,6 +65,7 @@ public class CoordinatorProcess {
                 .stream()
                 .map(FrequencyStatistics::getType)
                 .collect(Collectors.toSet());
+        logger.info("There are {} vertices we are going to focus on. They are {}", vertexTypes.size(), vertexTypes);
 
         // First Level initialization of the pattern tree
         PatternTree patternTree = new PatternTree();
@@ -76,6 +82,7 @@ public class CoordinatorProcess {
 
         // Define jobs and assign them to the workers
         Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(allDataPath.get(0), vertexTypes).getGraph().getGraph();
+        logger.info("The result of optimized first snapshot graph has {} vertices and {} edges", firstGraph.vertexSet().size(), firstGraph.edgeSet().size());
         Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
 
         // Send the edge data to the workers
@@ -132,7 +139,7 @@ public class CoordinatorProcess {
                 }
             }
         }
-        for (Map.Entry<Integer, List<TGFD>> entry: generalTGFDMap.entrySet()) {
+        for (Map.Entry<Integer, List<TGFD>> entry : generalTGFDMap.entrySet()) {
             List<TGFD> value = entry.getValue();
             if (value.size() > 1) {
                 logger.info("We found General TGFDs need to be fixed!!!");

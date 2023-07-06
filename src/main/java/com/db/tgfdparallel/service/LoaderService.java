@@ -108,7 +108,7 @@ public class LoaderService {
                     v.getTypes().add(nodeType);
                 }
             }
-            logger.info("Done. Number of Types: " + nodeMap.size());
+            logger.info("Done. Number of Vertex: " + nodeMap.size());
         } catch (Exception e) {
             logger.error(e.getMessage());
         }

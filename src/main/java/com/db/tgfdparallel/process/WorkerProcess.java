@@ -124,24 +124,30 @@ public class WorkerProcess {
 
             for (VSpawnPattern vSpawnedPatterns : vSpawnPatternList) {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
+                Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
                 matchesPerTimestampsByPTN.put(newPattern, new ArrayList<>());
                 for (int timestamp = 0; timestamp < config.getTimestamp(); timestamp++) {
                     matchesPerTimestampsByPTN.get(newPattern).add(new HashSet<>());
                     entityURIsByPTN.put(newPattern, new HashMap<>());
                 }
+                logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
                 Map<Integer, List<Job>> newJobsList = jobService.createNewJobsList(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
+                logger.info("We got {} new jobs to find new pattern's matches", newJobsList.size());
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
-                    runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
+                    int numOfMatches = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
+                    logger.info("We got {} matches for pattern: {} at timestamp: {}", numOfMatches, pattern, superstep);
                 }
 
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(entityURIsByPTN.get(newPattern),
                         vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
+                logger.info("The pattern support for pattern: {} is {}", pattern, newPatternSupport);
                 newPattern.setPatternSupport(newPatternSupport);
                 if (newPatternSupport < config.getPatternTheta()) {
                     newPattern.setPruned(true);
+                    logger.info("The pattern: {} didn't pass the support threshold", pattern);
                     continue;
                 }
 
@@ -186,12 +192,13 @@ public class WorkerProcess {
         }
     }
 
-    public void runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
-                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
-                            Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+    public int runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
+                           Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
+                           Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         long startTime = System.currentTimeMillis();
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
+        int numOfMatchesInTimestamp = 0;
 
         for (Job job : newJobsList.get(snapshotID)) {
             if (!verticesInGraph.contains(job.getCenterNode())) {
@@ -209,12 +216,13 @@ public class WorkerProcess {
             if (results.isomorphismExists()) {
                 Set<Set<ConstantLiteral>> matches = new HashSet<>();
 //                logger.info("Start Matching at {}", LocalDateTime.now());
-                int numOfMatchesInTimestamp = patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
+                numOfMatchesInTimestamp += patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
                         entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
 //                logger.info("End Matching at {}", LocalDateTime.now());
                 matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
             }
         }
+        return numOfMatchesInTimestamp;
     }
 }
 
