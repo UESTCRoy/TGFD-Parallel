@@ -121,7 +121,8 @@ public class WorkerProcess {
             List<PatternTreeNode> newPatternList = vSpawnPatternList.stream().map(VSpawnPattern::getNewPattern).collect(Collectors.toList());
             patternTree.getTree().add(newPatternList);
             level++;
-
+            int sumTimeOfMatch = 0;
+            int sumNumbOfMatch = 0;
             for (VSpawnPattern vSpawnedPatterns : vSpawnPatternList) {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
@@ -136,7 +137,10 @@ public class WorkerProcess {
                 logger.info("We got {} new jobs to find new pattern's matches", newJobsList.size());
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
-                    int numOfMatches = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
+                    int numOfMatches = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap)[0];
+                    int timeOfMatch = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap)[1];
+                    sumNumbOfMatch += numOfMatches;
+                    sumTimeOfMatch += timeOfMatch;
                     logger.info("We got {} matches for pattern: {} at timestamp: {}", numOfMatches, pattern, superstep);
                 }
 
@@ -160,6 +164,7 @@ public class WorkerProcess {
                 logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
                         level, newPattern.getPattern().getPattern(), constantTGFDs.size(), generalTGFDs.size());
             }
+            logger.info("Total {} matches are found in {} seconds on level {}", sumNumbOfMatch, sumTimeOfMatch, level);
         }
 
         // 生成constant与general的TGFD Map，返回给Coordinator汇总
@@ -192,14 +197,13 @@ public class WorkerProcess {
         }
     }
 
-    public int runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
+    public int[] runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                            Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        long startTime = System.currentTimeMillis();
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
         int numOfMatchesInTimestamp = 0;
-
+        long startTime = System.currentTimeMillis();
         for (Job job : newJobsList.get(snapshotID)) {
             if (!verticesInGraph.contains(job.getCenterNode())) {
                 continue;
@@ -222,7 +226,11 @@ public class WorkerProcess {
                 matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
             }
         }
-        return numOfMatchesInTimestamp;
+        long endTime = System.currentTimeMillis();
+        int timeOfMatching = (int) ((endTime - startTime) / 1000);
+//        System.out.println("Match total time: "+ timeOfMatching);
+//        System.out.println("Match total num: "+ numOfMatchesInTimestamp);
+        return new int[] {numOfMatchesInTimestamp, timeOfMatching};
     }
 }
 
