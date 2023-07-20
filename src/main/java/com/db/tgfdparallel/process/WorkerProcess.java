@@ -27,10 +27,11 @@ public class WorkerProcess {
     private final HSpawnService hSpawnService;
     private final TGFDService tgfdService;
     private final JobService jobService;
+    private final FastMatchService fastMatchService;
 
     @Autowired
     public WorkerProcess(AppConfig config, ActiveMQService activeMQService, DataShipperService dataShipperService, GraphService graphService,
-                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, JobService jobService) {
+                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, JobService jobService, FastMatchService fastMatchService) {
         this.config = config;
         this.activeMQService = activeMQService;
         this.dataShipperService = dataShipperService;
@@ -39,6 +40,7 @@ public class WorkerProcess {
         this.hSpawnService = hSpawnService;
         this.tgfdService = tgfdService;
         this.jobService = jobService;
+        this.fastMatchService = fastMatchService;
     }
 
     public void start() {
@@ -209,22 +211,25 @@ public class WorkerProcess {
                 continue;
             }
 
-            Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
-                    .flatMap(v -> v.getTypes().stream())
-                    .collect(Collectors.toSet());
-
-            // Diameter 根据level变化
-            Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
-            VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
-
-            if (results.isomorphismExists()) {
-                Set<Set<ConstantLiteral>> matches = new HashSet<>();
-//                logger.info("Start Matching at {}", LocalDateTime.now());
-                numOfMatchesInTimestamp += patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
-                        entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
-//                logger.info("End Matching at {}", LocalDateTime.now());
-                matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
-            }
+//            Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
+//                    .flatMap(v -> v.getTypes().stream())
+//                    .collect(Collectors.toSet());
+//
+//             //Diameter 根据level变化
+//            Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
+//            VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
+//            if (results.isomorphismExists()) {
+//                Set<Set<ConstantLiteral>> matches = new HashSet<>();
+//                numOfMatchesInTimestamp += patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
+//                        entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
+//                matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
+//            }
+            Set<Set<ConstantLiteral>> matches;
+            fastMatchService.init(graph, level, job.getPatternTreeNode().getPattern(), vertexTypesToActiveAttributesMap, snapshotID, job.getPatternTreeNode(), entityURIsByPTN.get(job.getPatternTreeNode()),job.getCenterNode());
+            fastMatchService.findMatches();
+            matches = fastMatchService.getMatches();
+            numOfMatchesInTimestamp += fastMatchService.getNumOfMatches();
+            matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
         }
         long endTime = System.currentTimeMillis();
         int timeOfMatching = (int) ((endTime - startTime) / 1000);
