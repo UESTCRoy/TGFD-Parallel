@@ -21,6 +21,9 @@ public class DeepCopyUtil {
         kryo.register(GraphLoader.class);
         kryo.register(VF2PatternGraph.class);
         kryo.register(PatternTreeNode.class);
+        kryo.register(PatternType.class);
+        kryo.register(MappingTree.class);
+        kryo.register(MappingTreeNode.class);
     }
 
     public static <T> T deepCopy(T original) {
