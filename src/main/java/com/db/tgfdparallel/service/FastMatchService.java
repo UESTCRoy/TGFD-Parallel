@@ -49,13 +49,6 @@ public class FastMatchService {
         return matches.size();
     }
 
-    public void findMatches() {
-        if (this.pattern.getPatternType() == PatternType.SingleNode)
-            findAllMatchesOfK0patternInSnapshotUsingCenterVertices();
-        else
-            findMatchesUsingEntityURIs();
-    }
-
     private void findAllMatchesOfK0patternInSnapshotUsingCenterVertices() {
         String patternVertexType = this.pattern.getCenterVertexType();
         for (Vertex v : this.graph.vertexSet()) {
@@ -73,17 +66,50 @@ public class FastMatchService {
         }
     }
 
-    private void findMatchesUsingEntityURIs() {
-//        Map<String, List<Integer>> existingEntityURIs = getExistingEntityURIs(graph, t);
+    public void findMatches() {
+//        Map<String, List<Integer>> existingEntityURIs = getExistingEntityURIs();
 //        for (Map.Entry<String, List<Integer>> entry: existingEntityURIs.entrySet()) {
-//            if (entry.getValue().get(t) > 0) {
+//            if (entry.getValue().get(this.timestamp) > 0) {
 //                String centerVertexUri = entry.getKey();
-//                Vertex centerVertex = graph.getGraph().getNode(centerVertexUri);
+//                Vertex centerVertex = null;
+//                for(Vertex v : this.graph.vertexSet()){
+//                    if(v.getUri().equals(centerVertexUri)){
+//                        centerVertex = v;
+//                        break;
+//                    }
+//                }
 //                findMatchesAroundThisCenterVertex(centerVertex);
 //            }
 //        }
+//        System.out.println(this.graph.vertexSet().size());
+//        for (Vertex vertex : this.graph.vertexSet()) {
+//            if (vertex.getTypes().stream().anyMatch(this.pattern.getCenterVertex().getTypes()::contains)) {
+//                findMatchesAroundThisCenterVertex(vertex);
+//            }
+//        }
         findMatchesAroundThisCenterVertex(this.centerNode);
-    }//TODO: figure out here
+    }
+
+//    private Map<String, List<Integer>> getExistingEntityURIs() {
+//        Map<String, List<Integer>> existingEntityURIs = new HashMap<>();
+//        extractListOfCenterVerticesInSnapshot(this.pattern.getCenterVertexType(), existingEntityURIs, this.timestamp);
+//        return existingEntityURIs;
+//    }
+//
+//    private void extractListOfCenterVerticesInSnapshot(String patternVertexType, Map<String, List<Integer>> centerVertexEntityURIs, int timestamp) {
+//        for (Vertex vertex : this.graph.vertexSet()) {
+//            if (vertex.getTypes().contains(patternVertexType)) {
+//                if (centerVertexEntityURIs != null) {
+//                    String entityURI = vertex.getUri();
+////                    centerVertexEntityURIs.putIfAbsent(entityURI, Discovery.Util.createEmptyArrayListOfSize(this.T));
+////                    centerVertexEntityURIs.get(entityURI).set(timestamp, centerVertexEntityURIs.get(entityURI).get(timestamp) + 1);
+//                    List<Integer> emptyArray = new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0));
+//                    centerVertexEntityURIs.putIfAbsent(entityURI, emptyArray);
+//                    centerVertexEntityURIs.get(entityURI).set(timestamp, centerVertexEntityURIs.get(entityURI).get(timestamp) + 1);
+//                }
+//            }
+//        }
+//    }
 
     private void findMatchesAroundThisCenterVertex(Vertex centerVertex) {
         PatternType patternType = this.pattern.getPatternType();
@@ -92,9 +118,8 @@ public class FastMatchService {
             case DoubleEdge: findAllMatchesOfK2PatternInSnapshotUsingCenterVertex(centerVertex); break;
             case Star: findAllMatchesOfStarPatternInSnapshotUsingCenterVertex(centerVertex); break;
             case Line: findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(centerVertex, false);  break;
-            case Circle: findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(centerVertex, true); break;
-            case Complex: findAllMatchesOfPatternInThisSnapshotUsingCenterVertex(centerVertex); break;
-            default: throw new IllegalArgumentException("Unrecognized pattern type");
+            case Circle: findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(centerVertex, true);  break;
+            default: findAllMatchesOfPatternInThisSnapshotUsingCenterVertex(centerVertex);
         }
     }
 
@@ -113,14 +138,14 @@ public class FastMatchService {
         Vertex currentPatternVertex = startVertex;
         Set<RelationshipEdge> visited = new HashSet<>();
         List<RelationshipEdge> patternEdgePath = new ArrayList<>();
-        System.out.println("Pattern edge path:");
+//        System.out.println("Pattern edge path:");
         while (visited.size() < this.pattern.getPattern().edgeSet().size()) {
             for (RelationshipEdge patternEdge : this.pattern.getPattern().edgesOf(currentPatternVertex)) {
                 if (!visited.contains(patternEdge)) {
                     boolean outgoing = patternEdge.getSource().equals(currentPatternVertex);
                     currentPatternVertex = outgoing ? patternEdge.getTarget() : patternEdge.getSource();
                     patternEdgePath.add(patternEdge);
-                    System.out.println(patternEdge);
+//                    System.out.println(patternEdge);
                     visited.add(patternEdge);
                     if (isCyclic) break;
                 }
@@ -129,11 +154,11 @@ public class FastMatchService {
 
         MappingTree mappingTree = new MappingTree();
         mappingTree.addLevel();
-        System.out.println("Added level to MappingTree. MappingTree levels: " + mappingTree.getTree().size());
+//        System.out.println("Added level to MappingTree. MappingTree levels: " + mappingTree.getTree().size());
         MappingTreeNode rootMappingTreeNode = new MappingTreeNode(startDataVertex, startVertexType, null);
         mappingTree.createNodeAtLevel(0, rootMappingTreeNode);
-        System.out.println("Added node to MappingTree level "+mappingTree.getTree().size()+".");
-        System.out.println("MappingTree level "+mappingTree.getTree().size()+" size = "+mappingTree.getTree().get(0).size());
+//        System.out.println("Added node to MappingTree level "+mappingTree.getTree().size()+".");
+//        System.out.println("MappingTree level "+mappingTree.getTree().size()+" size = "+mappingTree.getTree().get(0).size());
 
         for (int index = 0; index < this.pattern.getPattern().edgeSet().size(); index++) {
             String currentPatternEdgeLabel = patternEdgePath.get(index).getLabel();
@@ -160,8 +185,8 @@ public class FastMatchService {
                             }
                         }
                         mappingTree.createNodeAtLevel(index+1, newMappingTreeNode);
-                        System.out.println("Added node to MappingTree level "+mappingTree.getTree().size()+".");
-                        System.out.println("MappingTree level "+mappingTree.getTree().size()+" size = "+mappingTree.getTree().get(index+1).size());
+//                        System.out.println("Added node to MappingTree level "+mappingTree.getTree().size()+".");
+//                        System.out.println("MappingTree level "+mappingTree.getTree().size()+" size = "+mappingTree.getTree().get(index+1).size());
                     }
                 }
                 for (RelationshipEdge dataEdge : this.graph.incomingEdgesOf(currentDataVertex)) {
@@ -176,8 +201,8 @@ public class FastMatchService {
                             }
                         }
                         mappingTree.createNodeAtLevel(index+1, newMappingTreeNode);
-                        System.out.println("Added node to MappingTree level "+mappingTree.getTree().size()+".");
-                        System.out.println("MappingTree level "+mappingTree.getTree().size()+" size = "+mappingTree.getTree().get(index+1).size());
+//                        System.out.println("Added node to MappingTree level "+mappingTree.getTree().size()+".");
+//                        System.out.println("MappingTree level "+mappingTree.getTree().size()+" size = "+mappingTree.getTree().get(index+1).size());
                     }
                 }
             }
@@ -235,7 +260,7 @@ public class FastMatchService {
             this.matches.add(match);
         }
         String entityURI = centerDataVertex.getUri();
-        if (this.matches.size() > 0) { // equivalent to entityURI != null
+        if (entityURI != null) { // equivalent to entityURI != null
             List<Integer> emptyArray = new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0));
             this.entityURIs.putIfAbsent(entityURI, emptyArray);
             this.entityURIs.get(entityURI).set(timestamp, entityURIs.get(entityURI).get(timestamp) + this.matches.size());
@@ -243,20 +268,20 @@ public class FastMatchService {
     }
 
     private void findAllMatchesOfK1patternInSnapshotUsingCenterVertex(Vertex dataVertex) {
-        String centerVertexType = this.pattern.getCenterVertexType();
         Set<String> edgeLabels = this.pattern.getPattern().edgeSet().stream().map(RelationshipEdge::getLabel).collect(Collectors.toSet());
         String sourceType = this.pattern.getPattern().edgeSet().iterator().next().getSource().getTypes().iterator().next();
         String targetType = this.pattern.getPattern().edgeSet().iterator().next().getTarget().getTypes().iterator().next();
+        for(String centerVertexType: this.pattern.getCenterVertex().getTypes()){
         Set<RelationshipEdge> edgeSet;
         if (centerVertexType.equals(sourceType)) {
             edgeSet = this.graph.outgoingEdgesOf(dataVertex).stream().filter(e -> edgeLabels.contains(e.getLabel()) && e.getTarget().getTypes().contains(targetType)).collect(Collectors.toSet());
         } else {
             edgeSet = this.graph.incomingEdgesOf(dataVertex).stream().filter(e -> edgeLabels.contains(e.getLabel()) && e.getSource().getTypes().contains(sourceType)).collect(Collectors.toSet());
         }
-        extractMatches(edgeSet);
+        extractMatches(edgeSet,sourceType,targetType);
+        }
     }
 
-    // Use this for k=2 instead of findAllMatchesOfStarPattern to avoid overhead of creating a MappingTree
     private void findAllMatchesOfK2PatternInSnapshotUsingCenterVertex(Vertex dataVertex) {
         Set<Vertex> patternVertexSet = this.pattern.getPattern().vertexSet();
         Map<Vertex, Set<Vertex>> patternVertexToDataVerticesMap = getPatternVertexToDataVerticesMap(dataVertex);
@@ -293,7 +318,7 @@ public class FastMatchService {
             }
         }
         String entityURI = dataVertex.getUri();
-        if (this.matches.size() > 0) { // equivalent to entityURI != null
+        if (entityURI != null) { // equivalent to entityURI != null
             List<Integer> emptyArray = new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0));
             this.entityURIs.putIfAbsent(entityURI, emptyArray);
             this.entityURIs.get(entityURI).set(timestamp, entityURIs.get(entityURI).get(timestamp) + this.matches.size());
@@ -307,8 +332,8 @@ public class FastMatchService {
             Vertex nonCenterPatternVertex = patternEdge.getSource();
             patternVertexToDataVerticesMap.put(nonCenterPatternVertex, new HashSet<>());
             for (RelationshipEdge dataEdge: this.graph.incomingEdgesOf(dataVertex)) {
-                if (dataEdge.getLabel().equals(patternEdge.getLabel())
-                        && dataEdge.getSource().getTypes().contains(nonCenterPatternVertex.getTypes().iterator().next())) {
+                if (dataEdge.getLabel().equals(patternEdge.getLabel()) && dataEdge.getSource().getTypes().stream().anyMatch(nonCenterPatternVertex.getTypes()::contains)
+                ) {
                     patternVertexToDataVerticesMap.get(nonCenterPatternVertex).add(dataEdge.getSource());
                 }
             }
@@ -317,8 +342,8 @@ public class FastMatchService {
             Vertex nonCenterPatternVertex = patternEdge.getTarget();
             patternVertexToDataVerticesMap.put(nonCenterPatternVertex, new HashSet<>());
             for (RelationshipEdge dataEdge: this.graph.outgoingEdgesOf(dataVertex)) {
-                if (dataEdge.getLabel().equals(patternEdge.getLabel())
-                        && dataEdge.getTarget().getTypes().contains(nonCenterPatternVertex.getTypes().iterator().next())) {
+                if (dataEdge.getLabel().equals(patternEdge.getLabel()) && dataEdge.getTarget().getTypes().stream().anyMatch(nonCenterPatternVertex.getTypes()::contains)
+                ) {
                     patternVertexToDataVerticesMap.get(nonCenterPatternVertex).add(dataEdge.getTarget());
                 }
             }
@@ -328,8 +353,9 @@ public class FastMatchService {
 
     private Set<ConstantLiteral> getCenterDataVertexLiterals(Vertex dataVertex) {
         Set<ConstantLiteral> centerDataVertexLiterals = new HashSet<>();
-        String centerVertexType = this.pattern.getCenterVertexType();
+        Vertex centerVertex = this.pattern.getCenterVertex();
         Set<ConstantLiteral> activeAttributes = getActiveAttributesInPattern(this.pattern.getPattern().vertexSet(), true, this.vertexTypesToActiveAttributesMap);
+        for(String centerVertexType: centerVertex.getTypes()){
         for (Attribute matchedAttr: dataVertex.getAttributes()) {
             for (ConstantLiteral activeAttribute : activeAttributes) {
                 if (!centerVertexType.equals(activeAttribute.getVertexType())) continue;
@@ -337,14 +363,12 @@ public class FastMatchService {
                 ConstantLiteral literal = new ConstantLiteral(centerVertexType, matchedAttr.getAttrName(), matchedAttr.getAttrValue());
                 centerDataVertexLiterals.add(literal);
             }
-        }
+        }}
         return centerDataVertexLiterals;
     }
 
-    private void extractMatches(Set<RelationshipEdge> edgeSet) {
+    private void extractMatches(Set<RelationshipEdge> edgeSet,String sourceVertexType,String targetVertexType) {
         String patternEdgeLabel = this.pattern.getPattern().edgeSet().iterator().next().getLabel();
-        String sourceVertexType = this.pattern.getPattern().edgeSet().iterator().next().getSource().getTypes().iterator().next();
-        String targetVertexType = this.pattern.getPattern().edgeSet().iterator().next().getTarget().getTypes().iterator().next();
         for (RelationshipEdge edge: edgeSet) {
             String matchedEdgeLabel = edge.getLabel();
             Set<String> matchedSourceVertexType = edge.getSource().getTypes();
@@ -432,15 +456,14 @@ public class FastMatchService {
 
     private String extractAttributes(String patternVertexType, Set<ConstantLiteral> match, Vertex currentMatchedVertex) {
         String entityURI = null;
-        String centerVertexType = this.pattern.getCenterVertexType();
         Set<String> matchedVertexTypes = currentMatchedVertex.getTypes();
         Set<ConstantLiteral> activeAttributes = getActiveAttributesInPattern(this.pattern.getPattern().vertexSet(), true, this.vertexTypesToActiveAttributesMap);
         for (ConstantLiteral activeAttribute : activeAttributes) {
             if (!matchedVertexTypes.contains(activeAttribute.getVertexType())) continue;
             for (Attribute matchedAttr : currentMatchedVertex.getAttributes()) {
                 if (!activeAttribute.getAttrName().equals(matchedAttr.getAttrName())) continue;
-                if (matchedVertexTypes.contains(centerVertexType) && matchedAttr.getAttrName().equals("uri")) {
-                    entityURI = matchedAttr.getAttrValue();
+                if (matchedVertexTypes.stream().anyMatch(this.pattern.getCenterVertex().getTypes()::contains) && matchedAttr.getAttrName().equals("uri")) {
+                        entityURI = matchedAttr.getAttrValue();
                 }
                 ConstantLiteral xLiteral = new ConstantLiteral(patternVertexType, matchedAttr.getAttrName(), matchedAttr.getAttrValue());
                 match.add(xLiteral);

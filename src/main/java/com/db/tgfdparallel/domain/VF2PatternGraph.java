@@ -26,29 +26,43 @@ public class VF2PatternGraph implements Serializable {
     }
 
     public PatternType getPatternType() {
-        if (patternType == null) {
-            assignPatternType();
-        }
-        return patternType;
+        return assignPatternType();
     }
 
     public String getCenterVertexType() {
-        if(centerVertexType.equals("")){
-            findCenterNode();
-        }
+//        if(centerVertexType.equals("")){
+        findCenterNode();
+//        }
         return centerVertexType;
     }
 
     public Vertex getCenterVertex() {
-        if (this.centerVertex == null) {
-            findCenterNode();
-        }
-        return centerVertex;
+//        if (this.centerVertex == null) {
+//            findCenterNode();
+//        }
+//        return centerVertex;
+        return findCenterNode();
     }
 
-    private void findCenterNode() {
+    private Vertex findCenterNode() {
         int patternDiameter=0;
         Vertex centerNode=null;
+        //k=2
+        if(this.pattern.vertexSet().size() == 3 && this.pattern.edgeSet().size() == 2){
+            for(Vertex v : this.pattern.vertexSet()){
+                if(this.pattern.edgesOf(v).size() == 2){
+                    centerNode = v;
+                    break;
+                }
+            }
+            assert centerNode != null;
+            if(!centerNode.getTypes().isEmpty())
+                this.centerVertexType= centerNode.getTypes().iterator().next();
+            else
+                this.centerVertexType="NoType";
+            return centerNode;
+        }
+
         for (Vertex v:this.pattern.vertexSet()) {
             // Define a HashMap to store visited vertices
             HashMap<Vertex,Integer> visited=new HashMap<>();
@@ -107,25 +121,19 @@ public class VF2PatternGraph implements Serializable {
             this.centerVertexType= centerNode.getTypes().iterator().next();
         else
             this.centerVertexType="NoType";
-//        this.diameter=patternDiameter;//TODO: do we need diameter here?
+        return centerNode;
     }
 
-    public void assignPatternType() {
-        int patternSize = this.pattern.edgeSet().size();
-        if (patternSize < 1)
-            this.setPatternType(PatternType.SingleNode);
-        else if (patternSize == 1)
-            this.setPatternType(PatternType.SingleEdge);
-        else if (patternSize == 2)
-            this.setPatternType(PatternType.DoubleEdge);
-        else if (isStarPattern())
-            this.setPatternType(PatternType.Star);
-        else if (isLinePattern())
-            this.setPatternType(PatternType.Line);
-        else if (isCirclePattern())
-            this.setPatternType(PatternType.Circle);
-        else
-            this.setPatternType(PatternType.Complex);
+    public PatternType assignPatternType() {
+        int patternSize = this.getPattern().edgeSet().size();
+        if (patternSize < 1){this.patternType=PatternType.SingleNode;}
+        else if (patternSize == 1){this.patternType=PatternType.SingleEdge;}
+        else if (patternSize == 2){this.patternType=PatternType.DoubleEdge;}
+        else if (isStarPattern()){this.patternType=PatternType.Star;}
+        else if (isLinePattern()){this.patternType=PatternType.Line;}
+        else if (isCirclePattern()){this.patternType=PatternType.Circle;}
+        else{this.patternType=PatternType.Complex;}
+        return this.patternType;
     }
 
     private boolean isStarPattern() {

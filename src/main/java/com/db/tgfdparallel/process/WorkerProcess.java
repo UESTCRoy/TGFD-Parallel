@@ -210,20 +210,20 @@ public class WorkerProcess {
             if (!verticesInGraph.contains(job.getCenterNode())) {
                 continue;
             }
-
-//            Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
-//                    .flatMap(v -> v.getTypes().stream())
-//                    .collect(Collectors.toSet());
-//
-//             //Diameter 根据level变化
-//            Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
-//            VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
-//            if (results.isomorphismExists()) {
-//                Set<Set<ConstantLiteral>> matches = new HashSet<>();
-//                numOfMatchesInTimestamp += patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
-//                        entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
-//                matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
-//            }
+            //1
+            Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
+                    .flatMap(v -> v.getTypes().stream())
+                    .collect(Collectors.toSet());
+             //Diameter 根据level变化
+            Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
+            VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
+            if (results.isomorphismExists()) {
+                Set<Set<ConstantLiteral>> matches = new HashSet<>();
+                numOfMatchesInTimestamp += patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
+                        entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
+                matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
+            }
+            //2
             Set<Set<ConstantLiteral>> matches;
             fastMatchService.init(graph, level, job.getPatternTreeNode().getPattern(), vertexTypesToActiveAttributesMap, snapshotID, job.getPatternTreeNode(), entityURIsByPTN.get(job.getPatternTreeNode()),job.getCenterNode());
             fastMatchService.findMatches();
@@ -234,7 +234,7 @@ public class WorkerProcess {
         long endTime = System.currentTimeMillis();
         int timeOfMatching = (int) ((endTime - startTime) / 1000);
 //        System.out.println("Match total time: "+ timeOfMatching);
-//        System.out.println("Match total num: "+ numOfMatchesInTimestamp);
+//        System.out.println("Match total numb: "+ numOfMatchesInTimestamp);
         return new int[] {numOfMatchesInTimestamp, timeOfMatching};
     }
 }
