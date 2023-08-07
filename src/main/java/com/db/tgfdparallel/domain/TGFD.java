@@ -8,13 +8,13 @@ import java.io.Serializable;
 @Data
 @AllArgsConstructor
 public class TGFD implements Serializable {
-    // TODO: 给这个class加entitySize和k(level)
     private VF2PatternGraph pattern;
-    private Delta delta;
+    private Pair delta;
     private DataDependency dependency;
     private Double tgfdSupport;
     private Double patternSupport;
     private int level;
+    private int entitySize;
 
     @Override
     public String toString() {

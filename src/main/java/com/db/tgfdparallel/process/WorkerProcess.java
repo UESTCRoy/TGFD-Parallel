@@ -133,7 +133,10 @@ public class WorkerProcess {
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
                 Map<Integer, List<Job>> newJobsList = jobService.createNewJobsList(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
-                logger.info("We got {} new jobs to find new pattern's matches", newJobsList.size());
+                int numOfNewJobs = newJobsList.values().stream()
+                        .mapToInt(List::size)
+                        .sum();
+                logger.info("We got {} new jobs to find new pattern's matches", numOfNewJobs);
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     int numOfMatches = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);

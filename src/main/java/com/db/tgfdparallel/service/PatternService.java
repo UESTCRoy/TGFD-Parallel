@@ -29,10 +29,9 @@ public class PatternService {
         this.config = config;
     }
 
-    public List<PatternTreeNode> vSpawnSinglePatternTreeNode(ProcessedHistogramData histogramData, PatternTree patternTree) {
+    public List<PatternTreeNode> vSpawnSinglePatternTreeNode(List<FrequencyStatistics> sortedVertexHistogram, PatternTree patternTree) {
         addLevel(patternTree);
         List<PatternTreeNode> singleNodePatternTreeNodes = new ArrayList<>();
-        List<FrequencyStatistics> sortedVertexHistogram = histogramData.getSortedVertexHistogram();
 
         logger.info("VSpawn Level 0");
 

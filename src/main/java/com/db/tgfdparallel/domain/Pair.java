@@ -4,10 +4,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.io.Serializable;
+
 @Data
 @EqualsAndHashCode
 @AllArgsConstructor
-public class Pair implements Comparable<Pair>{
+public class Pair implements Comparable<Pair>, Serializable {
     private int min;
     private int max;
 

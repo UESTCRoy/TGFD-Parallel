@@ -10,9 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,10 +24,12 @@ public class CoordinatorProcess {
     private final JobService jobService;
     private final DataShipperService dataShipperService;
     private final ChangeService changeService;
+    private final TGFDService tgfdService;
 
     @Autowired
     public CoordinatorProcess(AppConfig config, GraphService graphService, HistogramService histogramService, PatternService patternService,
-                              ActiveMQService activeMQService, JobService jobService, DataShipperService dataShipperService, ChangeService changeService) {
+                              ActiveMQService activeMQService, JobService jobService, DataShipperService dataShipperService, ChangeService changeService,
+                              TGFDService tgfdService) {
         this.config = config;
         this.graphService = graphService;
         this.histogramService = histogramService;
@@ -38,30 +38,22 @@ public class CoordinatorProcess {
         this.jobService = jobService;
         this.dataShipperService = dataShipperService;
         this.changeService = changeService;
+        this.tgfdService = tgfdService;
     }
 
     public void start() {
-        logger.info("Check the status of the workers");
-        activeMQService.initializeWorkersStatus();
-        activeMQService.statusCheck();
+        initializeWorkers();
 
         // Generate histogram and send the histogram data to all workers
         List<String> allDataPath = config.getAllDataPath();
-        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshot(allDataPath)
-                .stream()
-                .map(x -> x.getGraph().getGraph())
-                .collect(Collectors.toList());
-
-        for (int i = 0; i < graphLoaders.size(); i++) {
-            Graph<Vertex, RelationshipEdge> graph = graphLoaders.get(i);
-            logger.info("At timestamp {} we got {} vertex and {} edges", i, graph.vertexSet().size(), graph.edgeSet().size());
-        }
+        List<Graph<Vertex, RelationshipEdge>> graphLoaders = loadAllSnapshots(allDataPath);
 
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
         dataShipperService.sendHistogramData(histogramData);
 
-        Set<String> vertexTypes = histogramData.getSortedVertexHistogram()
+        List<FrequencyStatistics> sortedVertexHistogram = histogramData.getSortedVertexHistogram();
+        Set<String> vertexTypes = sortedVertexHistogram
                 .stream()
                 .map(FrequencyStatistics::getType)
                 .collect(Collectors.toSet());
@@ -69,7 +61,7 @@ public class CoordinatorProcess {
 
         // First Level initialization of the pattern tree
         PatternTree patternTree = new PatternTree();
-        List<PatternTreeNode> patternTreeNodes = patternService.vSpawnSinglePatternTreeNode(histogramData, patternTree);
+        List<PatternTreeNode> patternTreeNodes = patternService.vSpawnSinglePatternTreeNode(sortedVertexHistogram, patternTree);
 
         // Send the first level of pattern tree to the worker
         String fileName = dataShipperService.uploadSingleNodePattern(patternTreeNodes);
@@ -104,50 +96,36 @@ public class CoordinatorProcess {
             logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
-        int numOfPositiveTGFDs = 0;
-        int numOfNegativeTGFDs = 0;
-        int numOfToBeDone = 0;
-        Map<Integer, List<TGFD>> integerSetMap = dataShipperService.downloadConstantTGFD("constant");
+        // 处理Constant TGFD
+        Map<Integer, List<TGFD>> constantTGFDMap = dataShipperService.downloadConstantTGFD("constant");
+        tgfdService.processConstantTGFD(constantTGFDMap);
+
+        // 处理General TGFD
         Map<Integer, List<TGFD>> generalTGFDMap = dataShipperService.downloadConstantTGFD("general");
-        for (Map.Entry<Integer, List<TGFD>> entry : integerSetMap.entrySet()) {
-            List<TGFD> constantTGFDsList = entry.getValue();
-            Integer hashKey = entry.getKey();
-            // 如果constantTGFDsList size为1，positive情况，skip
-            // 如果constantTGFDsList size不为1，比较DataDependency的rhs的attrValue
-            //      1.如果attrValue一样，则更新Delta和entitySize，然后重新计算support
-            //          a. Delta无交集：各自计算support，然后与theta比较
-            //          b. Delta有交集：取交集部分
-            //      2.如果attrValue不一样，则视为negative处理
-            if (constantTGFDsList.size() == 1) {
-                numOfPositiveTGFDs++;
-                continue;
-            } else {
-                Set<String> collect = constantTGFDsList.stream()
-                        .map(TGFD::getDependency)
-                        .map(x -> x.getY().get(0))
-                        .map(x -> (ConstantLiteral) x)
-                        .map(ConstantLiteral::getAttrValue)
-                        .collect(Collectors.toSet());
-                // 有不一样的人attrValue，integerSetMap
-                if (collect.size() != constantTGFDsList.size()) {
-                    integerSetMap.remove(hashKey);
-                    numOfNegativeTGFDs++;
-                } else {
-                    // TODO: 给TGFD加个entitySize属性
-                    // TODO: 给delta处理交集
-                    numOfToBeDone++;
-                }
-            }
-        }
-        for (Map.Entry<Integer, List<TGFD>> entry : generalTGFDMap.entrySet()) {
-            List<TGFD> value = entry.getValue();
-            if (value.size() > 1) {
-                logger.info("We found General TGFDs need to be fixed!!!");
-            }
-        }
-        FileUtil.saveConstantTGFDsToFile(integerSetMap, "Constant-TGFD");
-        FileUtil.saveConstantTGFDsToFile(integerSetMap, "General-TGFD");
-        logger.info("There are {} Positive TGFDs and {} Negative TGFDs and {} to be done!", numOfPositiveTGFDs, numOfNegativeTGFDs, numOfToBeDone);
+        tgfdService.processGeneralTGFD(generalTGFDMap);
+
+        FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
+        FileUtil.saveConstantTGFDsToFile(generalTGFDMap, "General-TGFD");
     }
 
+    private void initializeWorkers() {
+        logger.info("Check the status of the workers");
+        activeMQService.initializeWorkersStatus();
+        activeMQService.statusCheck();
+    }
+
+    private List<Graph<Vertex, RelationshipEdge>> loadAllSnapshots(List<String> allDataPath) {
+        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshot(allDataPath)
+                .stream()
+                .map(x -> x.getGraph().getGraph())
+                .collect(Collectors.toList());
+
+        for (int i = 0; i < graphLoaders.size(); i++) {
+            Graph<Vertex, RelationshipEdge> graph = graphLoaders.get(i);
+            logger.info("At timestamp {} we got {} vertex and {} edges", i, graph.vertexSet().size(), graph.edgeSet().size());
+        }
+
+        return graphLoaders;
+    }
+    
 }

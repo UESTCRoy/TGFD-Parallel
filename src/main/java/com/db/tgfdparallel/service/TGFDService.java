@@ -3,6 +3,7 @@ package com.db.tgfdparallel.service;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.utils.DeepCopyUtil;
+import com.db.tgfdparallel.utils.MathUtil;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,212 +26,92 @@ public class TGFDService {
     }
 
     public List<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
-                                           Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities,
-                                           Map<Pair, List<TreeSet<Pair>>> deltaToPairsMap) {
+                                              Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs) {
+        List<TGFD> result = new ArrayList<>();
+        int level = patternNode.getPattern().getPattern().vertexSet().size();
 
-        List<TGFD> tgfds = new ArrayList<>();
+        for (Map.Entry<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
+            Set<ConstantLiteral> xLiterals = entityEntry.getKey();
+            List<Map.Entry<ConstantLiteral, List<Integer>>> rhsAttrValuesTimestampsSortedByFreq = entityEntry.getValue();
 
+            // 不管rhsAttrValuesTimestampsSortedByFreq的size，也计算Delta，对每个都转成TGFD，然后support返回给Coordinator处理
+            for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
+                VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(patternNode.getPattern());
+                DataDependency newDependency = new DataDependency();
+                AttributeDependency constantPath = new AttributeDependency();
+
+                // 处理Dependency
+                String yAttrValue = entry.getKey().getAttrValue();
+                generateDataDependency(yAttrValue, yLiteral, newPattern, newDependency, constantPath, xLiterals);
+
+                // 处理Delta
+                List<Integer> values = entry.getValue();
+                Pair minMaxPair = getMinMaxPair(values);
+                if (minMaxPair == null) {
+                    continue;
+                }
+                int minDistance = minMaxPair.getMin();
+                int maxDistance = minMaxPair.getMax();
+
+                // 处理deltaToPairsMap，为后续生成generalTGFDs
+                if (minDistance <= maxDistance) {
+                    candidatePairs.add(minMaxPair);
+                }
+
+                Delta candidateTGFDdelta = new Delta(Period.ofYears(minDistance), Period.ofYears(maxDistance), Duration.ofDays(365));
+                constantPath.setDelta(candidateTGFDdelta);
+
+                // Coordinator处，delta, support 需要重新计算
+                TGFD candidateConstantTGFD = new TGFD(patternNode.getPattern(), minMaxPair, newDependency, 0.0,
+                        patternNode.getPatternSupport(), level, entities.size());
+                result.add(candidateConstantTGFD);
+            }
+        }
+
+        return result;
+    }
+
+    public void generateDataDependency(String attrValue, ConstantLiteral yLiteral, VF2PatternGraph newPattern, DataDependency newDependency,
+                                       AttributeDependency constantPath, Set<ConstantLiteral> xLiterals) {
+        Map<String, ConstantLiteral> vertexTypeToLiteral = new HashMap<>();
         String yVertexType = yLiteral.getVertexType();
         String yAttrName = yLiteral.getAttrName();
 
-        for (Map.Entry<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
-            VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(patternNode.getPattern());
-            DataDependency newDependency = new DataDependency();
-            AttributeDependency constantPath = new AttributeDependency();
-            String attrValue = entityEntry.getValue().get(0).getKey().getAttrValue();
-
-            Map<String, ConstantLiteral> vertexTypeToLiteral = new HashMap<>();
-            for (ConstantLiteral xLiteral : entityEntry.getKey()) {
-                vertexTypeToLiteral.put(xLiteral.getVertexType(), xLiteral);
-            }
-
-            for (Vertex v : newPattern.getPattern().vertexSet()) {
-                for (String vType : v.getTypes()) {
-                    if (vType.equalsIgnoreCase(yVertexType)) {
-                        v.getAttributes().add(new Attribute(yAttrName));
-                        if (newDependency.getY().size() == 0) {
-                            ConstantLiteral newY = new ConstantLiteral(yVertexType, yAttrName, attrValue);
-                            newDependency.getY().add(newY);
-                        }
-                    }
-
-                    ConstantLiteral xLiteral = vertexTypeToLiteral.get(vType);
-                    if (xLiteral != null) {
-                        v.getAttributes().add(new Attribute(xLiteral.getAttrName(), xLiteral.getAttrValue()));
-                        ConstantLiteral newXLiteral = new ConstantLiteral(vType, xLiteral.getAttrName(), xLiteral.getAttrValue());
-                        newDependency.getX().add(newXLiteral);
-                        constantPath.getLhs().add(newXLiteral);
-                    }
-                }
-            }
-            constantPath.setRhs(new ConstantLiteral(yVertexType, yAttrName, attrValue));
-
-            List<Map.Entry<ConstantLiteral, List<Integer>>> rhsAttrValuesTimestampsSortedByFreq = entityEntry.getValue();
-            List<Pair> candidateDeltas = new ArrayList<>();
-
-            // 处理Positive与Negative的情况
-            if (rhsAttrValuesTimestampsSortedByFreq.size() == 1) {
-                List<Integer> timestampCounts = rhsAttrValuesTimestampsSortedByFreq.get(0).getValue();
-                Pair candidateDelta = getMinMaxPair(timestampCounts);
-                if (candidateDelta != null) {
-                    candidateDeltas.add(candidateDelta);
-                }
-            } else if (rhsAttrValuesTimestampsSortedByFreq.size() > 1) {
-                continue;
-//                // 判断delta是否有交集，没有则good拆分成positive，若有交集，则discard，后续升级成general
-//                List<List<Integer>> listsToCheck = new ArrayList<>();
-//                for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
-//                    listsToCheck.add(entry.getValue());
-//                }
-//                if (checkNoOverlap(listsToCheck)) {
-//                    // 拆分成多个positive
-//                    for (List<Integer> timestamp : listsToCheck) {
-//                        Pair candidateDelta = getMinMaxPair(timestamp);
-//                        if (candidateDelta != null) {
-//                            candidateDeltas.add(candidateDelta);
-//                        }
-//                    }
-//                } else {
-//                    // discard
-//                    continue;
-//                }
-            }
-
-            // Compute TGFD support
-            Delta candidateTGFDdelta;
-            double candidateTGFDsupport = 0;
-            Pair mostSupportedDelta = null;
-            TreeSet<Pair> mostSupportedSatisfyingPairs = null;
-            for (Pair candidateDelta : candidateDeltas) {
-                int minDistance = candidateDelta.getMin();
-                int maxDistance = candidateDelta.getMax();
-                if (minDistance <= maxDistance) {
-                    List<Integer> timestampCounts = rhsAttrValuesTimestampsSortedByFreq.get(0).getValue();
-                    TreeSet<Pair> satisfyingPairs = new TreeSet<>();
-                    for (int index = 0; index < timestampCounts.size(); index++) {
-                        int indexCount = timestampCounts.get(index);
-                        if (indexCount == 0) {
-                            continue;
-                        }
-                        if (indexCount > 1 && 0 >= minDistance && 0 <= maxDistance) {
-                            satisfyingPairs.add(new Pair(index, index));
-                        }
-                        for (int j = index + 1; j < timestampCounts.size(); j++) {
-                            int jCount = timestampCounts.get(j);
-                            if (jCount > 0) {
-                                int distance = j - index;
-                                if (distance >= minDistance && distance <= maxDistance) {
-                                    satisfyingPairs.add(new Pair(index, j));
-                                }
-                            }
-                        }
-                    }
-                    double candidateSupport = calculateTGFDSupport(satisfyingPairs.size(), entities.size(), config.getTimestamp());
-                    if (candidateSupport > candidateTGFDsupport) {
-                        candidateTGFDsupport = candidateSupport;
-                        mostSupportedDelta = candidateDelta;
-                        mostSupportedSatisfyingPairs = satisfyingPairs;
-                    }
-                }
-            }
-
-            if (mostSupportedDelta == null) {
-//                logger.error("Could not come up with mostSupportedDelta for entity: " + entityEntry.getKey());
-                continue;
-            }
-
-            deltaToPairsMap.computeIfAbsent(mostSupportedDelta, k -> new ArrayList<>()).add(mostSupportedSatisfyingPairs);
-
-            int minDistance = mostSupportedDelta.getMin();
-            int maxDistance = mostSupportedDelta.getMax();
-            candidateTGFDdelta = new Delta(Period.ofYears(minDistance), Period.ofYears(maxDistance), Duration.ofDays(365));
-            constantPath.setDelta(candidateTGFDdelta);
-
-            int level = patternNode.getPattern().getPattern().vertexSet().size();
-
-            // TODO: Ensures we don't expand constant TGFDs from previous iterations
-//            boolean isNotMinimal = false;
-//            if (Util.hasMinimalityPruning && constantPath.isSuperSetOfPathAndSubsetOfDelta(patternNode.getAllMinimalConstantDependenciesOnThisPath())) {
-//                System.out.println("Candidate constant TGFD " + constantPath + " is a superset of an existing minimal constant TGFD");
-//                isNotMinimal = true;
-//            }
-//            if (isNotMinimal) continue;
-
-            if (candidateTGFDsupport < config.getTgfdTheta()) {
-                // TODO: add the NegativeTGFD
-//                negativeTGFDs.add(new NegativeTGFD(entityEntry));
-                logger.info("Could not satisfy TGFD support threshold for entity: " + entityEntry.getKey());
-            } else {
-                TGFD entityTGFD = new TGFD(patternNode.getPattern(), candidateTGFDdelta, newDependency, candidateTGFDsupport, patternNode.getPatternSupport(), level);
-                tgfds.add(entityTGFD);
-//                if (Util.hasMinimalityPruning) patternNode.addMinimalConstantDependency(constantPath);
-            }
+        for (ConstantLiteral xLiteral : xLiterals) {
+            vertexTypeToLiteral.put(xLiteral.getVertexType(), xLiteral);
         }
 
-        return tgfds;
+        for (Vertex v : newPattern.getPattern().vertexSet()) {
+            for (String vType : v.getTypes()) {
+                if (vType.equalsIgnoreCase(yVertexType)) {
+                    v.getAttributes().add(new Attribute(yAttrName));
+                    ConstantLiteral newY = new ConstantLiteral(yVertexType, yAttrName, attrValue);
+                    newDependency.getY().add(newY);
+                }
+
+                ConstantLiteral xLiteral = vertexTypeToLiteral.get(vType);
+                if (xLiteral != null) {
+                    v.getAttributes().add(new Attribute(xLiteral.getAttrName(), xLiteral.getAttrValue()));
+                    ConstantLiteral newXLiteral = new ConstantLiteral(vType, xLiteral.getAttrName(), xLiteral.getAttrValue());
+                    newDependency.getX().add(newXLiteral);
+                    constantPath.getLhs().add(newXLiteral);
+                }
+            }
+        }
+        constantPath.setRhs(new ConstantLiteral(yVertexType, yAttrName, attrValue));
     }
 
-    public List<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, double patternSupport, AttributeDependency literalPath, int entitiesSize,
-                                          Map<Pair, List<TreeSet<Pair>>> deltaToPairsMap, LiteralTreeNode literalTreeNode) {
+    public List<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, double patternSupport, AttributeDependency literalPath,
+                                             List<Pair> deltas, int entitySize) {
         List<TGFD> tgfds = new ArrayList<>();
+        List<Pair> candidateDeltas = mergeOverlappingPairs(deltas);
 
-//        int numOfEntitiesWithDeltas = deltaToPairsMap.values().stream().mapToInt(List::size).sum();
-//        int numOfPairs = deltaToPairsMap.values().stream().flatMap(List::stream).mapToInt(Set::size).sum();
-
-        Map<Pair, List<Pair>> intersections = new HashMap<>();
-//        int[] currMinMax = {0, config.getTimestamp() - 1};
-        int currMin = 0;
-        int currMax = config.getTimestamp() - 1;
-        List<Pair> currSatisfyingAttrValues = new ArrayList<>();
-        for (Pair deltaPair : deltaToPairsMap.keySet().stream().sorted().collect(Collectors.toList())) {
-            if (Math.max(currMin, deltaPair.getMin()) <= Math.min(currMax, deltaPair.getMax())) {
-                currMin = Math.max(currMin, deltaPair.getMin());
-                currMax = Math.min(currMax, deltaPair.getMax());
-//				currSatisfyingAttrValues.add(satisfyingPairsSet.get(index)); // By axiom 4
-                continue;
-            }
-            for (Map.Entry<Pair, List<TreeSet<Pair>>> deltaToPairsEntry : deltaToPairsMap.entrySet()) {
-                for (TreeSet<Pair> satisfyingPairSet : deltaToPairsEntry.getValue()) {
-                    for (Pair satisfyingPair : satisfyingPairSet) {
-                        if (satisfyingPair.getMax() - satisfyingPair.getMin() >= currMin && satisfyingPair.getMax() - satisfyingPair.getMin() <= currMax) {
-                            currSatisfyingAttrValues.add(new Pair(satisfyingPair.getMin(), satisfyingPair.getMax()));
-                        }
-                    }
-                }
-            }
-            intersections.putIfAbsent(new Pair(currMin, currMax), currSatisfyingAttrValues);
-            currSatisfyingAttrValues = new ArrayList<>();
-            currMin = 0;
-            currMax = config.getTimestamp() - 1;
-            if (Math.max(currMin, deltaPair.getMin()) <= Math.min(currMax, deltaPair.getMax())) {
-                currMin = Math.max(currMin, deltaPair.getMin());
-                currMax = Math.min(currMax, deltaPair.getMax());
-            }
-        }
-        for (Map.Entry<Pair, List<TreeSet<Pair>>> deltaToPairsEntry : deltaToPairsMap.entrySet()) {
-            for (TreeSet<Pair> satisfyingPairSet : deltaToPairsEntry.getValue()) {
-                for (Pair satisfyingPair : satisfyingPairSet) {
-                    if (satisfyingPair.getMax() - satisfyingPair.getMin() >= currMin && satisfyingPair.getMax() - satisfyingPair.getMin() <= currMax) {
-                        currSatisfyingAttrValues.add(new Pair(satisfyingPair.getMin(), satisfyingPair.getMax()));
-                    }
-                }
-            }
-        }
-        intersections.putIfAbsent(new Pair(currMin, currMax), currSatisfyingAttrValues);
-
-        List<Map.Entry<Pair, List<Pair>>> sortedIntersections = new ArrayList<>(intersections.entrySet());
-        sortedIntersections.sort(Comparator.comparing(o -> o.getValue().size(), Comparator.reverseOrder()));
-
-        sortedIntersections.forEach(intersection -> {
-            Pair candidateDelta = intersection.getKey();
-            int generalMin = candidateDelta.getMin();
-            int generalMax = candidateDelta.getMax();
-
-            int numberOfSatisfyingPairs = intersection.getValue().size();
-            double tgfdSupport = calculateTGFDSupport(numberOfSatisfyingPairs, entitiesSize, config.getTimestamp());
-
-            Delta delta = new Delta(Period.ofYears(generalMin), Period.ofYears(generalMax), Duration.ofDays(365));
-
+        /*
+            咱就不在worker计算support了，把相同Literal Path获得的General TGFD的Delta合并
+            然后返回给Coordinator进行下一步合并Delta，在进行support的计算
+            在Coordinator进行合并，可能需要重新设计hashKey
+         */
+        for (Pair delta : candidateDeltas) {
             DataDependency generalDependency = new DataDependency();
             String yVertexType = literalPath.getRhs().getVertexType();
             String yAttrName = literalPath.getRhs().getAttrName();
@@ -241,21 +122,18 @@ public class TGFDService {
 
             int level = patternTreeNode.getPattern().getPattern().vertexSet().size();
 
-            if (tgfdSupport < config.getTgfdTheta()) {
-                logger.info("Support for candidate general TGFD is below support threshold");
-            } else {
-                TGFD tgfd = new TGFD(patternTreeNode.getPattern(), delta, generalDependency, tgfdSupport, patternSupport, level);
-                tgfds.add(tgfd);
-            }
-        });
+            TGFD tgfd = new TGFD(patternTreeNode.getPattern(), delta, generalDependency, 0.0, patternSupport, level, entitySize);
+            tgfds.add(tgfd);
+        }
 
         return tgfds;
     }
 
-    private double calculateTGFDSupport(double numerator, double S, int T) {
+    public double calculateTGFDSupport(double numerator, double S, int T) {
         double denominator = S * CombinatoricsUtils.binomialCoefficient(T + 1, 2);
-        if (numerator > denominator)
+        if (numerator > denominator) {
             throw new IllegalArgumentException("numerator > denominator");
+        }
         return numerator / denominator;
     }
 
@@ -321,21 +199,145 @@ public class TGFDService {
         return new Pair(minDistance, maxDistance);
     }
 
-    private boolean checkNoOverlap(List<List<Integer>> listOfLists) {
-        int length = listOfLists.get(0).size();
+    public List<Pair> mergeOverlappingPairs(List<Pair> inputPairs) {
+        if (inputPairs == null || inputPairs.isEmpty()) {
+            return new ArrayList<>();
+        }
 
-        for (int i = 0; i < length; i++) {
-            int existCount = 0;
-            for (List<Integer> list : listOfLists) {
-                if (list.get(i) != 0) {
-                    existCount++;
-                }
-            }
-            if (existCount > 1) {
-                return false;
+        Collections.sort(inputPairs);
+
+        List<Pair> mergedPairs = new ArrayList<>();
+        Pair currentPair = inputPairs.get(0);
+
+        for (int i = 1; i < inputPairs.size(); i++) {
+            Pair nextPair = inputPairs.get(i);
+
+            // If overlapping
+            if (currentPair.getMax() >= nextPair.getMin()) {
+                int newMin = Math.max(currentPair.getMin(), nextPair.getMin());
+                int newMax = Math.min(currentPair.getMax(), nextPair.getMax());
+                currentPair = new Pair(newMin, newMax);
+            } else {
+                mergedPairs.add(currentPair);
+                currentPair = nextPair;
             }
         }
-        return true;
+        mergedPairs.add(currentPair);
+
+        return mergedPairs;
+    }
+
+    public boolean checkDeltaOverlapping(Pair pair1, Pair pair2) {
+        return pair1.getMax() >= pair2.getMin() && pair1.getMin() <= pair2.getMax();
+    }
+
+    public void processConstantTGFD(Map<Integer, List<TGFD>> constantTGFDMap) {
+        int numOfPositiveTGFDs = 0;
+        int numOfNegativeTGFDs = 0;
+        for (Map.Entry<Integer, List<TGFD>> entry : constantTGFDMap.entrySet()) {
+            List<TGFD> constantTGFDsList = entry.getValue();
+            Integer hashKey = entry.getKey();
+
+            if (constantTGFDsList.size() == 1) {
+                numOfPositiveTGFDs++;
+                TGFD tgfd = updateTGFDWithSupport(constantTGFDsList.get(0));
+                List<TGFD> result = new ArrayList<>();
+                result.add(tgfd);
+                constantTGFDMap.put(hashKey, result);
+            } else {
+                Map<String, List<TGFD>> tgfdMap = constantTGFDsList.stream()
+                        .collect(Collectors.groupingBy(tgfd -> {
+                            ConstantLiteral constantLiteral = (ConstantLiteral) tgfd.getDependency().getY().get(0);
+                            return constantLiteral.getAttrValue();
+                        }));
+                for (String key : tgfdMap.keySet()) {
+                    List<TGFD> tgfds = tgfdMap.get(key);
+                    List<TGFD> mergeResult = mergeAndRecreateTGFD(tgfds);
+                    tgfdMap.put(key, mergeResult);
+                }
+                List<TGFD> combinedList = tgfdMap.values().stream()
+                        .flatMap(List::stream)
+                        .collect(Collectors.toList());
+
+                List<TGFD> constantTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
+                removeOverlappingDeltas(constantTGFDResults);
+                constantTGFDMap.put(hashKey, constantTGFDResults);
+                numOfNegativeTGFDs += constantTGFDsList.size() - constantTGFDResults.size();
+            }
+        }
+        logger.info("There are {} Positive TGFDs and {} Negative TGFDs", numOfPositiveTGFDs, numOfNegativeTGFDs);
+    }
+
+    public void processGeneralTGFD(Map<Integer, List<TGFD>> generalTGFDMap) {
+        for (Map.Entry<Integer, List<TGFD>> entry : generalTGFDMap.entrySet()) {
+            List<TGFD> tgfds = entry.getValue();
+            List<TGFD> combinedList = mergeAndRecreateTGFD(tgfds);
+            List<TGFD> generalTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
+            generalTGFDMap.put(entry.getKey(), generalTGFDResults);
+        }
+    }
+
+    private List<TGFD> mergeAndRecreateTGFD(List<TGFD> tgfds) {
+        TGFD originalTGFD = tgfds.get(0);
+
+        List<Pair> deltas = tgfds.stream()
+                .map(TGFD::getDelta)
+                .collect(Collectors.toList());
+
+        List<Pair> mergedDeltas = mergeOverlappingPairs(deltas);
+
+        // If the merged deltas have less size, it means some deltas were merged
+        if (mergedDeltas.size() < deltas.size()) {
+            return mergedDeltas.stream()
+                    .map(mergedDelta -> new TGFD(
+                            originalTGFD.getPattern(),
+                            mergedDelta,
+                            originalTGFD.getDependency(),
+                            originalTGFD.getTgfdSupport(),
+                            originalTGFD.getPatternSupport(),
+                            originalTGFD.getLevel(),
+                            originalTGFD.getEntitySize()))
+                    .collect(Collectors.toList());
+        } else {
+            return tgfds;
+        }
+    }
+
+    private TGFD updateTGFDWithSupport(TGFD tgfd) {
+        Pair delta = tgfd.getDelta();
+        int numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
+        double tgfdSupport = calculateTGFDSupport(numberOfDeltas, tgfd.getEntitySize(), config.getTimestamp());
+        tgfd.setTgfdSupport(tgfdSupport);
+        return tgfd;
+    }
+
+    private List<TGFD> updateAndFilterTGFDListWithSupport(List<TGFD> tgfds) {
+        int entitySize = tgfds.stream()
+                .mapToInt(TGFD::getEntitySize)
+                .sum();
+        tgfds.forEach(tgfd -> {
+            Pair delta = tgfd.getDelta();
+            int numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
+            double tgfdSupport = calculateTGFDSupport(numberOfDeltas, entitySize, config.getTimestamp());
+            tgfd.setTgfdSupport(tgfdSupport);
+        });
+
+        return tgfds.stream()
+                .filter(tgfd -> tgfd.getTgfdSupport() >= config.getTgfdTheta())
+                .collect(Collectors.toList());
+    }
+
+    private void removeOverlappingDeltas(List<TGFD> constantTGFDResults) {
+        Set<TGFD> toRemove = new HashSet<>();
+        for (int i = 0; i < constantTGFDResults.size(); i++) {
+            for (int j = i + 1; j < constantTGFDResults.size(); j++) {
+                if (checkDeltaOverlapping(constantTGFDResults.get(i).getDelta(), constantTGFDResults.get(j).getDelta())) {
+                    toRemove.add(constantTGFDResults.get(i));
+                    toRemove.add(constantTGFDResults.get(j));
+                }
+            }
+        }
+        constantTGFDResults.removeAll(toRemove);
     }
 
 }
