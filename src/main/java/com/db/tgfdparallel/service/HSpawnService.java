@@ -53,8 +53,6 @@ public class HSpawnService {
             }
 
             Set<AttributeDependency> visitedPaths = new HashSet<>();
-//            List<TGFD> currentLevelConstantTGFDs = new ArrayList<>();
-//            List<TGFD> currentLevelGeneralTGFDs = new ArrayList<>();
 
             for (LiteralTreeNode previousLiteral : literalTreePreviousLevel) {
                 List<ConstantLiteral> parentsPathToRoot = getPathToRoot(previousLiteral);
@@ -109,13 +107,18 @@ public class HSpawnService {
                     addDependencyAttributesToPattern(copyOfNewPattern.getPattern(), newPath);
                     Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = findEntities(newPath, matchesPerTimestamps);
                     Map<Pair, List<TreeSet<Pair>>> deltaToPairsMap = new HashMap<>();
+                    List<Pair> candidatePairs = new ArrayList<>();
 
-                    List<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(copyOfNewPattern, newPath.getRhs(), entities, deltaToPairsMap);
+                    List<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(copyOfNewPattern, newPath.getRhs(), entities, candidatePairs);
                     result.get(0).addAll(constantTGFD);
 
-                    if (!deltaToPairsMap.isEmpty()) {
+                    if (!candidatePairs.isEmpty()) {
+//                        int totalSize = 0;
+//                        for (List<Map.Entry<ConstantLiteral, List<Integer>>> list : entities.values()) {
+//                            totalSize += list.size();
+//                        }
                         List<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(copyOfNewPattern, patternTreeNode.getPatternSupport(),
-                                newPath, entities.size(), deltaToPairsMap, node);
+                                newPath, candidatePairs, entities.size());
                         result.get(1).addAll(generalTGFD);
                     }
                 }

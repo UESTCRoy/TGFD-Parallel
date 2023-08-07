@@ -109,6 +109,7 @@ public class JobService {
             List<Job> newJobsAtIndex = new ArrayList<>();
             List<Job> additionalJobs = new ArrayList<>();
             for (Job job : assignedJobsBySnapshot.get(index)) {
+                // TODO: 检查这里是不是有问题
                 if (job.getPatternTreeNode().getPattern().equals(pattern)) {
                     Job newJob = new Job(job.getID(), job.getCenterNode(), newPattern);
                     newJobsAtIndex.add(newJob);
