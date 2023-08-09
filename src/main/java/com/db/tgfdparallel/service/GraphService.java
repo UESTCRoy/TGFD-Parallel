@@ -559,4 +559,29 @@ public class GraphService {
     {
         return givenTypes.stream().anyMatch(validTypes::contains);
     }
+
+    public Graph<Vertex, RelationshipEdge> updateChangedGraph(Map<String, Vertex> nodeMap, Graph<Vertex, RelationshipEdge> graph) {
+        Graph<Vertex, RelationshipEdge> newGraph = new DefaultDirectedGraph<>(RelationshipEdge.class);
+
+        // 使用nodeMap直接获取并添加更新后的顶点到新图
+        for (Vertex vertex : graph.vertexSet()) {
+            Vertex updatedVertex = nodeMap.get(vertex.getUri());
+            if (updatedVertex != null) {
+                newGraph.addVertex(updatedVertex);
+            }
+        }
+
+        // 使用nodeMap来获取更新后的顶点，然后添加边
+        for (RelationshipEdge edge : graph.edgeSet()) {
+            Vertex sourceVertex = nodeMap.get(graph.getEdgeSource(edge).getUri());
+            Vertex targetVertex = nodeMap.get(graph.getEdgeTarget(edge).getUri());
+
+            if (sourceVertex != null && targetVertex != null) {
+                newGraph.addEdge(sourceVertex, targetVertex, edge);
+            }
+        }
+
+        return newGraph;
+    }
+
 }

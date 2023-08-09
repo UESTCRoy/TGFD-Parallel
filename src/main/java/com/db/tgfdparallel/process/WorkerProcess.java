@@ -97,7 +97,7 @@ public class WorkerProcess {
                         node -> node
                 ));
         for (int i = 0; i < config.getTimestamp(); i++) {
-            patternService.singleNodePatternInitialization(loaders[i].getGraph().getGraph(), i, vertexTypesToActiveAttributesMap,
+            patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
                     patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
         }
 
@@ -138,6 +138,7 @@ public class WorkerProcess {
                         .sum();
                 logger.info("We got {} new jobs to find new pattern's matches", numOfNewJobs);
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
+//                     TODO: 这里的loader
                     GraphLoader loader = loaders[superstep];
                     int numOfMatches = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
                     logger.info("We got {} matches for pattern: {} at timestamp: {}", numOfMatches, pattern, superstep);
@@ -200,6 +201,7 @@ public class WorkerProcess {
                            Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         long startTime = System.currentTimeMillis();
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
+        Map<String, Vertex> nodeMap = loader.getGraph().getNodeMap();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
         int numOfMatchesInTimestamp = 0;
 
@@ -214,7 +216,11 @@ public class WorkerProcess {
 
             // Diameter 根据level变化
             Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
-            VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
+            if (snapshotID != 0) {
+                subgraph = graphService.updateChangedGraph(nodeMap, subgraph);
+            }
+            VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results =
+                    graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
 
             if (results.isomorphismExists()) {
                 Set<Set<ConstantLiteral>> matches = new HashSet<>();
