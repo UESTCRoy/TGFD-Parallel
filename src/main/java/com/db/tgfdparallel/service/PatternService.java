@@ -72,8 +72,7 @@ public class PatternService {
         candidatePattern.getPattern().addVertex(vertex);
     }
 
-    public void singleNodePatternInitialization(Graph<Vertex, RelationshipEdge> graph,
-                                                int snapshotID,
+    public void singleNodePatternInitialization(VF2DataGraph dataGraph, int snapshotID,
                                                 Map<String, Set<String>> vertexTypesToActiveAttributesMap,
                                                 Map<String, PatternTreeNode> singlePatternTreeNodesMap,
                                                 Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
@@ -83,6 +82,8 @@ public class PatternService {
         int diameter = 0;
         AtomicInteger jobID = new AtomicInteger(0);
         assignedJobsBySnapshot.put(snapshotID, new ArrayList<>());
+        Map<String, Vertex> nodeMap = dataGraph.getNodeMap();
+        Graph<Vertex, RelationshipEdge> graph = dataGraph.getGraph();
 
         for (Map.Entry<String, PatternTreeNode> entry : singlePatternTreeNodesMap.entrySet()) {
             String ptnType = entry.getKey();
@@ -94,6 +95,9 @@ public class PatternService {
                     .filter(vertex -> vertex.getTypes().contains(ptnType))
                     .forEach(vertex -> {
                         Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, vertex, diameter, validTypes);
+                        if (snapshotID != 0) {
+                            subgraph = graphService.updateChangedGraph(nodeMap, subgraph);
+                        }
                         // TODO: 有些vertex加载后有uri属性，而有些则没有？
 
                         Set<Set<ConstantLiteral>> matches = new HashSet<>();
