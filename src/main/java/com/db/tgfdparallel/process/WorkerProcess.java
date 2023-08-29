@@ -66,7 +66,8 @@ public class WorkerProcess {
         logger.info("Received singlePatternTreeNodes From Coordinator, {} ms", singlePatternEndTime - singlePatternStartTime);
 
         // Load the first snapshot
-        GraphLoader graphLoader = graphService.loadFirstSnapshot(config.getDataPath(), vertexTypes);
+        String dataPath = dataShipperService.awsWorkerDataPreparation();
+        GraphLoader graphLoader = graphService.loadFirstSnapshot(dataPath, vertexTypes);
         logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
                 graphLoader.getGraph().getGraph().edgeSet().size(),
                 graphLoader.getGraph().getGraph().vertexSet().size());
@@ -138,7 +139,6 @@ public class WorkerProcess {
                         .sum();
                 logger.info("We got {} new jobs to find new pattern's matches", numOfNewJobs);
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
-//                     TODO: 这里的loader
                     GraphLoader loader = loaders[superstep];
                     int numOfMatches = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
                     logger.info("We got {} matches for pattern: {} at timestamp: {}", numOfMatches, pattern, superstep);

@@ -26,7 +26,7 @@ public class TGFDService {
     }
 
     public List<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
-                                              Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs) {
+                                           Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs) {
         List<TGFD> result = new ArrayList<>();
         int level = patternNode.getPattern().getPattern().vertexSet().size();
 
@@ -102,7 +102,7 @@ public class TGFDService {
     }
 
     public List<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, double patternSupport, AttributeDependency literalPath,
-                                             List<Pair> deltas, int entitySize) {
+                                          List<Pair> deltas, int entitySize) {
         List<TGFD> tgfds = new ArrayList<>();
         List<Pair> candidateDeltas = mergeOverlappingPairs(deltas);
 
@@ -239,11 +239,14 @@ public class TGFDService {
             Integer hashKey = entry.getKey();
 
             if (constantTGFDsList.size() == 1) {
-                numOfPositiveTGFDs++;
                 TGFD tgfd = updateTGFDWithSupport(constantTGFDsList.get(0));
-                List<TGFD> result = new ArrayList<>();
-                result.add(tgfd);
-                constantTGFDMap.put(hashKey, result);
+
+                if (tgfd.getTgfdSupport() >= config.getTgfdTheta()) {
+                    numOfPositiveTGFDs++;
+                    constantTGFDMap.put(hashKey, Collections.singletonList(tgfd));
+                } else {
+                    constantTGFDMap.remove(hashKey);
+                }
             } else {
                 Map<String, List<TGFD>> tgfdMap = constantTGFDsList.stream()
                         .collect(Collectors.groupingBy(tgfd -> {
@@ -269,12 +272,15 @@ public class TGFDService {
     }
 
     public void processGeneralTGFD(Map<Integer, List<TGFD>> generalTGFDMap) {
+        int count = 0;
         for (Map.Entry<Integer, List<TGFD>> entry : generalTGFDMap.entrySet()) {
             List<TGFD> tgfds = entry.getValue();
             List<TGFD> combinedList = mergeAndRecreateTGFD(tgfds);
             List<TGFD> generalTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
+            count += generalTGFDResults.size();
             generalTGFDMap.put(entry.getKey(), generalTGFDResults);
         }
+        logger.info("There are {} General TGFD", count);
     }
 
     private List<TGFD> mergeAndRecreateTGFD(List<TGFD> tgfds) {

@@ -15,4 +15,9 @@ public class DataDependency implements Serializable {
         this.x = new ArrayList<>();
         this.y = new ArrayList<>();
     }
+
+    public DataDependency(List<Literal> x, List<Literal> y) {
+        this.x = x;
+        this.y = y;
+    }
 }

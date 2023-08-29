@@ -17,22 +17,17 @@ import java.util.stream.IntStream;
 @Service
 public class ChangeService {
     private static final Logger logger = LoggerFactory.getLogger(ChangeService.class);
-    private final AppConfig config;
     private final GraphService graphService;
 
     @Autowired
-    public ChangeService(AppConfig config, GraphService graphService) {
-        this.config = config;
+    public ChangeService(GraphService graphService) {
         this.graphService = graphService;
     }
 
-    public List<List<Change>> changeGenerator() {
-        String changeFilePath = config.getChangeFilePath();
-        int timestamp = config.getTimestamp();
-
+    public List<List<Change>> changeGenerator(String changeFilePath, int timestamp) {
         return IntStream.range(0, timestamp - 1)
                 .mapToObj(i -> {
-                    String path = changeFilePath + "/changes_t" + i + "_t" + (i + 1) + "_" + "nospecifictgfds_full" + ".json";
+                    String path = changeFilePath + "/changes_t" + i + "_t" + (i + 1) + "_" + "noSpecificTGFDs_full" + ".json";
                     JSONArray json = FileUtil.readJsonFile(path);
                     if (json == null) {
                         throw new RuntimeException("Failed to read JSON from file: " + path);
