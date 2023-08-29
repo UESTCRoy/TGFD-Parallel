@@ -44,8 +44,17 @@ public class CoordinatorProcess {
     public void start() {
         initializeWorkers();
 
-        // Generate histogram and send the histogram data to all workers
+        // Graph Path
         List<String> allDataPath = config.getAllDataPath();
+        List<String> splitGraphPath = config.getSplitGraphPath();
+        String changeFilePath = config.getChangeFilePath();
+        // AWS Data Preparation
+        if (dataShipperService.isAmazonMode()) {
+            changeFilePath = "/home/ec2-user/changeFile";
+            dataShipperService.awsCoordinatorDataPreparation(allDataPath, splitGraphPath, changeFilePath);
+        }
+
+        // Generate histogram and send the histogram data to all workers
         List<Graph<Vertex, RelationshipEdge>> graphLoaders = loadAllSnapshots(allDataPath);
 
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
@@ -70,7 +79,7 @@ public class CoordinatorProcess {
         activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
 
         // Initialize the graph from the split graph, String (VertexURI) -> Integer (FragmentID)
-        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(config.getSplitGraphPath(), vertexTypes);
+        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
 
         // Define jobs and assign them to the workers
         Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(allDataPath.get(0), vertexTypes).getGraph().getGraph();
@@ -82,7 +91,7 @@ public class CoordinatorProcess {
         dataShipperService.edgeShipper(listOfFiles);
 
         // Generate all the changes for histogram computation and send to all workers
-        List<List<Change>> changesData = changeService.changeGenerator();
+        List<List<Change>> changesData = changeService.changeGenerator(changeFilePath, config.getTimestamp());
         logger.info("Generating change files for {} snapshots and got {} change files", config.getTimestamp(), changesData.size());
         // Send the changes to the workers
         // 不搞异步通过changeFile生成new graph，与worker确认巴拉巴拉，我们一次性把change上传，然后让worker逐步生成new graph
@@ -106,6 +115,9 @@ public class CoordinatorProcess {
 
         FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
         FileUtil.saveConstantTGFDsToFile(generalTGFDMap, "General-TGFD");
+//        if (dataShipperService.isAmazonMode()) {
+//
+//        }
     }
 
     private void initializeWorkers() {
@@ -127,5 +139,5 @@ public class CoordinatorProcess {
 
         return graphLoaders;
     }
-    
+
 }

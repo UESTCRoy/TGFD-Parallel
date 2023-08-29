@@ -1,6 +1,5 @@
 package com.db.tgfdparallel.service;
 
-import com.amazonaws.services.dynamodbv2.xspec.S;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.utils.FileUtil;
@@ -14,8 +13,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class DataShipperService {
@@ -24,7 +22,7 @@ public class DataShipperService {
     private final ActiveMQService activeMQService;
     private final HDFSService hdfsService;
     private final S3Service s3Service;
-    private final AtomicBoolean workersStatusChecker;
+    private final AtomicInteger atomicId = new AtomicInteger(0);
 
     @Autowired
     public DataShipperService(AppConfig config, ActiveMQService activeMQService, HDFSService hdfsService, S3Service s3Service) {
@@ -32,7 +30,6 @@ public class DataShipperService {
         this.activeMQService = activeMQService;
         this.hdfsService = hdfsService;
         this.s3Service = s3Service;
-        this.workersStatusChecker = new AtomicBoolean(true);
     }
 
     public Map<Integer, List<String>> dataToBeShippedAndSend(int batchSize, Map<Integer, List<RelationshipEdge>> edgesToBeShipped, Map<String, Integer> fragments) {
@@ -90,10 +87,8 @@ public class DataShipperService {
         return listOfFiles;
     }
 
-    // TODO: Solve duplicate fileName date is not enough!
     public void sendEdgesToWorkersForShipment(Map<Integer, Map<Integer, List<SimpleEdge>>> dataToBeShipped, Map<Integer, List<String>> listOfFiles) {
-        LocalDateTime now = LocalDateTime.now();
-        String date = now.getHour() + "_" + now.getMinute() + "_" + now.getNano();
+        int currentId = atomicId.incrementAndGet();
 
         // Initialize listOfFiles
         for (int id : dataToBeShipped.keySet()) {
@@ -115,10 +110,10 @@ public class DataShipperService {
                     sb.append(edge.getSrc()).append("\t").append(edge.getDst()).append("\t").append(edge.getLabel()).append("\n");
                 }
 
-                String fileName = date + "_F" + id + "_to_" + key + ".txt";
+                String fileName = currentId + "_F" + id + "_to_" + key + ".txt";
 
                 if (isAmazonMode()) {
-                    s3Service.uploadWholeTextFile(config.getBucketName(), fileName, sb.toString());
+                    s3Service.uploadWholeTextFile(fileName, sb.toString());
                 } else {
                     hdfsService.uploadWholeTextFile(config.getHDFSPath(), fileName, sb.toString());
                 }
@@ -156,14 +151,14 @@ public class DataShipperService {
 
         String changeFileName = date + "_Change[" + snapshotID + "]" + ".ser";
         if (isAmazonMode()) {
-            s3Service.uploadObject(config.getBucketName(), changeFileName, data);
+            s3Service.uploadObject(changeFileName, data);
         } else {
             hdfsService.uploadObject(config.getHDFSPath(), changeFileName, data);
         }
         return changeFileName;
     }
 
-    private boolean isAmazonMode() {
+    public boolean isAmazonMode() {
         return config.getMode().equals("amazon");
     }
 
@@ -174,7 +169,7 @@ public class DataShipperService {
 //            s3Service.uploadObject(config.getBucketName(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
 //            s3Service.uploadObject(config.getBucketName(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
 //            s3Service.uploadObject(config.getBucketName(), "sortedVertexHistogram", data.getSortedVertexHistogram());
-            s3Service.uploadObject(config.getBucketName(), "processedHistogramData", data);
+            s3Service.uploadObject("processedHistogramData", data);
         } else {
 //            hdfsService.uploadObject(config.getHDFSPath(), "vertexHistogram", data.getVertexHistogram());
 //            hdfsService.uploadObject(config.getHDFSPath(), "activeAttributesSet", data.getActiveAttributesSet());
@@ -197,7 +192,7 @@ public class DataShipperService {
                 if (msg != null && msg.startsWith("#histogramData")) {
                     histogramStatsReceived = true;
                     data = isAmazonMode() ?
-                            (ProcessedHistogramData) s3Service.downloadObject(config.getBucketName(), "processedHistogramData") :
+                            (ProcessedHistogramData) s3Service.downloadObject("processedHistogramData") :
                             (ProcessedHistogramData) hdfsService.downloadObject(config.getHDFSPath(), "processedHistogramData");
                 }
                 activeMQService.closeConsumer();
@@ -218,7 +213,7 @@ public class DataShipperService {
         logger.info("Pattern Tree Nodes: {}", patternTreeNodes);
         String fileName = "SinglePatterns_" + LocalDate.now();
         if (isAmazonMode()) {
-            s3Service.uploadObject(config.getBucketName(), fileName, patternTreeNodes);
+            s3Service.uploadObject(fileName, patternTreeNodes);
         } else {
             hdfsService.uploadObject(config.getHDFSPath(), fileName, patternTreeNodes);
         }
@@ -237,7 +232,7 @@ public class DataShipperService {
                     String fileName = msg.split("\t")[1];
                     if (isAmazonMode()) {
                         singlePatternTreeNodesList = FileUtil.castList(
-                                s3Service.downloadObject(config.getBucketName(), fileName), PatternTreeNode.class
+                                s3Service.downloadObject(fileName), PatternTreeNode.class
                         );
                     } else {
                         singlePatternTreeNodesList = FileUtil.castList(
@@ -271,7 +266,7 @@ public class DataShipperService {
         for (int i = 1; i < filePaths.length; i++) {
             StringBuilder sb;
             if (isAmazonMode()) {
-                sb = s3Service.downloadWholeTextFile(config.getBucketName(), filePaths[i]);
+                sb = s3Service.downloadWholeTextFile(filePaths[i]);
             } else {
                 sb = hdfsService.downloadWholeTextFile(config.getHDFSPath(), filePaths[i]);
             }
@@ -297,7 +292,7 @@ public class DataShipperService {
         String key = date + "_G_" + config.getNodeName() + "_to_" + config.getWorkers().get(workerID - 1) + ".ser";
 
         if (isAmazonMode()) {
-            s3Service.uploadObject(config.getBucketName(), key, vertexRelationshipEdgeGraph);
+            s3Service.uploadObject(key, vertexRelationshipEdgeGraph);
         } else {
             hdfsService.uploadObject(config.getHDFSPath(), key, vertexRelationshipEdgeGraph);
         }
@@ -312,7 +307,7 @@ public class DataShipperService {
         Object obj = null;
 
         if (isAmazonMode()) {
-            obj = s3Service.downloadObject(config.getBucketName(), msg);
+            obj = s3Service.downloadObject(msg);
         } else {
             obj = hdfsService.downloadObject(config.getHDFSPath(), msg);
         }
@@ -324,8 +319,8 @@ public class DataShipperService {
         String constantKey = config.getNodeName() + "_constantTGFD";
         String generalKey = config.getNodeName() + "_generalTGFD";
         if (isAmazonMode()) {
-            s3Service.uploadObject(config.getBucketName(), constantKey, constantTGFDMap);
-            s3Service.uploadObject(config.getBucketName(), generalKey, generalTGFDMap);
+            s3Service.uploadObject(constantKey, constantTGFDMap);
+            s3Service.uploadObject(generalKey, generalTGFDMap);
         } else {
             hdfsService.uploadObject(config.getHDFSPath(), constantKey, constantTGFDMap);
             hdfsService.uploadObject(config.getHDFSPath(), generalKey, generalTGFDMap);
@@ -395,4 +390,47 @@ public class DataShipperService {
         }
         return changesData;
     }
+
+    public void awsCoordinatorDataPreparation(List<String> allDataPath, List<String> splitGraphPath, String changeFilePath) {
+        logger.info("Downloading Graph Information From S3");
+        // Process allDataPath
+        processPaths(allDataPath, "/home/ec2-user/completeGraph/");
+        // Process splitGraphPath
+        processPaths(splitGraphPath, "/home/ec2-user/splitGraph/");
+        // Handle changeFile (download entire directory)
+        s3Service.downloadObjectsToInstanceDirectory(changeFilePath);
+        logger.info("Finish Download From S3 to Instance");
+    }
+
+    public String awsWorkerDataPreparation() {
+        String dataPath = config.getDataPath();
+        if (isAmazonMode()) {
+            String fileName = getFileNameFromPath(dataPath);
+            String destinationFile = "/home/ec2-user/dataPath/" + fileName;
+            s3Service.downloadFileToInstance(dataPath, destinationFile);
+            return destinationFile;
+        } else {
+            return dataPath;
+        }
+    }
+
+    public void processPaths(List<String> paths, String homePath) {
+        for (int i = 0; i < paths.size(); i++) {
+            String dataPath = paths.get(i);
+            String fileName = getFileNameFromPath(dataPath);
+            String destinationFile = homePath + fileName;
+            s3Service.downloadFileToInstance(dataPath, destinationFile);
+            paths.set(i, destinationFile);
+        }
+    }
+
+    private String getFileNameFromPath(String path) {
+        String[] parts = path.split("/");
+        return parts[parts.length - 1];
+    }
+
+//    public void uploadResultToS3(String fileName) {
+//        s3Service.
+//    }
+
 }
