@@ -1,6 +1,1 @@
 # TGFD-Parallel
-Copyright © 2023 Yaoxu Wang
-
-Unauthorized copying, distribution, or use of this software is prohibited without explicit permission from the owner.
-
-For permission, please contact roywangwyx@gmail.com.
