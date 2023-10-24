@@ -2,11 +2,17 @@ package com.db.tgfdparallel.service;
 
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.waiters.WaiterResponse;
 import software.amazon.awssdk.regions.Region;
 import com.db.tgfdparallel.config.AppConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.ec2.Ec2Client;
+import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
+import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
+import software.amazon.awssdk.services.ec2.model.StopInstancesRequest;
+import software.amazon.awssdk.services.ec2.waiters.Ec2Waiter;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -18,19 +24,25 @@ import software.amazon.awssdk.transfer.s3.model.*;
 import software.amazon.awssdk.transfer.s3.progress.LoggingTransferListener;
 
 import java.io.*;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.file.Paths;
 
 @Service
 public class S3Service {
     private static final Logger logger = LoggerFactory.getLogger(S3Service.class);
     private final S3Client s3Client;
+    private final Ec2Client ec2;
     private final AppConfig config;
     private final S3TransferManager transferManager;
     private final String bucketName = "tgfd";
-    private final String S3TempPrefix = "temp/";
+    private final String S3TempPrefix = "temp";
 
     public S3Service(AppConfig config) {
         s3Client = S3Client.builder()
+                .region(Region.US_EAST_2)
+                .build();
+        ec2 = Ec2Client.builder()
                 .region(Region.US_EAST_2)
                 .build();
         this.config = config;
@@ -50,7 +62,7 @@ public class S3Service {
 
     public void uploadObject(String keyName, Object obj) {
         logger.info("uploadObject: bucketName={}, keyName={}", bucketName, keyName);
-        String awsPath = S3TempPrefix + keyName;
+        String awsPath = S3TempPrefix + config.getVpcNumber() + "/" + keyName;
 
         try {
             byte[] data = serializeObject(obj);
@@ -68,7 +80,7 @@ public class S3Service {
 
     public Object downloadObject(String keyName) throws IOException {
         logger.info("downloadObject: bucketName={}, keyName={}", bucketName, keyName);
-        String awsPath = S3TempPrefix + keyName;
+        String awsPath = S3TempPrefix + config.getVpcNumber() + "/" + keyName;
         Object obj = null;
         try {
             logger.info("Downloading an object");
@@ -91,7 +103,7 @@ public class S3Service {
 
     public void uploadWholeTextFile(String key, String textToBeUploaded) {
         logger.info("Uploading to Amazon S3");
-        String awsPath = S3TempPrefix + key;
+        String awsPath = S3TempPrefix + config.getVpcNumber() + "/" + key;
 
         try {
             PutObjectRequest objectRequest = PutObjectRequest.builder()
@@ -107,7 +119,7 @@ public class S3Service {
 
     public StringBuilder downloadWholeTextFile(String key) {
         StringBuilder sb = new StringBuilder();
-        String awsPath = S3TempPrefix + key;
+        String awsPath = S3TempPrefix + config.getVpcNumber() + "/" + key;
 
         try {
             logger.info("Downloading text file from Amazon S3 - Bucket name: " + bucketName + " - Key: " + key);
@@ -174,6 +186,44 @@ public class S3Service {
         try (ObjectInputStream in = new ObjectInputStream(objectContent)) {
             return in.readObject();
         }
+    }
+
+    private String retrieveInstanceId() {
+        String EC2Id = null;
+        try {
+            String inputLine;
+            URL EC2MetaData = new URL("http://169.254.169.254/latest/meta-data/instance-id");
+            URLConnection EC2MD = EC2MetaData.openConnection();
+            BufferedReader in = new BufferedReader(new InputStreamReader(EC2MD.getInputStream()));
+            while ((inputLine = in.readLine()) != null) {
+                EC2Id = inputLine;
+            }
+            in.close();
+        } catch (IOException e) {
+            System.err.println("Error while retrieving instance ID: " + e.getMessage());
+        }
+        return EC2Id;
+    }
+
+    public void stopInstance() {
+        String instanceId = config.getInstanceID();
+        Ec2Waiter ec2Waiter = Ec2Waiter.builder()
+                .overrideConfiguration(b -> b.maxAttempts(100))
+                .client(ec2)
+                .build();
+        StopInstancesRequest request = StopInstancesRequest.builder()
+                .instanceIds(instanceId)
+                .build();
+
+        System.out.println("Use an Ec2Waiter to wait for the instance to stop. This will take a few minutes.");
+        ec2.stopInstances(request);
+        DescribeInstancesRequest instanceRequest = DescribeInstancesRequest.builder()
+                .instanceIds(instanceId)
+                .build();
+
+        WaiterResponse<DescribeInstancesResponse> waiterResponse = ec2Waiter.waitUntilInstanceStopped(instanceRequest);
+        waiterResponse.matched().response().ifPresent(System.out::println);
+        System.out.println("Successfully stopped instance " + instanceId);
     }
 
 }

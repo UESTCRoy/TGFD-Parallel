@@ -25,11 +25,12 @@ public class CoordinatorProcess {
     private final DataShipperService dataShipperService;
     private final ChangeService changeService;
     private final TGFDService tgfdService;
+    private final S3Service s3Service;
 
     @Autowired
     public CoordinatorProcess(AppConfig config, GraphService graphService, HistogramService histogramService, PatternService patternService,
                               ActiveMQService activeMQService, JobService jobService, DataShipperService dataShipperService, ChangeService changeService,
-                              TGFDService tgfdService) {
+                              TGFDService tgfdService, S3Service s3Service) {
         this.config = config;
         this.graphService = graphService;
         this.histogramService = histogramService;
@@ -39,6 +40,7 @@ public class CoordinatorProcess {
         this.dataShipperService = dataShipperService;
         this.changeService = changeService;
         this.tgfdService = tgfdService;
+        this.s3Service = s3Service;
     }
 
     public void start() {
@@ -115,6 +117,9 @@ public class CoordinatorProcess {
 
         FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
         FileUtil.saveConstantTGFDsToFile(generalTGFDMap, "General-TGFD");
+        if (dataShipperService.isAmazonMode()) {
+            s3Service.stopInstance();
+        }
 //        if (dataShipperService.isAmazonMode()) {
 //
 //        }

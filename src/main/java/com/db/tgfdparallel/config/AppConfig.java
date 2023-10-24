@@ -65,4 +65,10 @@ public class AppConfig {
 
     @Value("${HDFSPath}")
     private String HDFSPath;
+
+    @Value("${vpcNumber}")
+    private int vpcNumber;
+
+    @Value("${instanceID}")
+    private String instanceID;
 }

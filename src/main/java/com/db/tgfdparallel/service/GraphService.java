@@ -501,6 +501,9 @@ public class GraphService {
 
         try {
             activeMQService.connectConsumer(config.getNodeName());
+//            long timeoutDuration = 120000; // 例如，设置为60秒。根据需求调整
+//            long startTime = System.currentTimeMillis();
+
             while (!datashipper) {
                 String msg = activeMQService.receive();
                 if (msg.startsWith("#datashipper")) {
@@ -508,6 +511,11 @@ public class GraphService {
                     logger.info("The data to be shipped has been received.");
                     datashipper = true;
                 }
+
+//                if ((System.currentTimeMillis() - startTime) >= timeoutDuration) {
+//                    // 如果超过指定时间没有收到消息，跳出循环
+//                    break;
+//                }
             }
             activeMQService.closeConsumer();
 

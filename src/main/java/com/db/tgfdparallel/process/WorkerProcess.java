@@ -27,10 +27,11 @@ public class WorkerProcess {
     private final HSpawnService hSpawnService;
     private final TGFDService tgfdService;
     private final JobService jobService;
+    private final S3Service s3Service;
 
     @Autowired
     public WorkerProcess(AppConfig config, ActiveMQService activeMQService, DataShipperService dataShipperService, GraphService graphService,
-                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, JobService jobService) {
+                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, JobService jobService, S3Service s3Service) {
         this.config = config;
         this.activeMQService = activeMQService;
         this.dataShipperService = dataShipperService;
@@ -39,6 +40,7 @@ public class WorkerProcess {
         this.hSpawnService = hSpawnService;
         this.tgfdService = tgfdService;
         this.jobService = jobService;
+        this.s3Service = s3Service;
     }
 
     public void start() {
@@ -165,6 +167,9 @@ public class WorkerProcess {
                         level, newPattern.getPattern().getPattern(), constantTGFDs.size(), generalTGFDs.size());
             }
         }
+        logger.info("======================================");
+        logger.info("The Maximum Level We got is {}", level);
+        logger.info("======================================");
 
         // 生成constant与general的TGFD Map，返回给Coordinator汇总
         for (TGFD data : constantTGFDs) {
@@ -182,6 +187,9 @@ public class WorkerProcess {
         logger.info("Send {} constant and {} general TGFDs to Coordinator", constantTGFDs.size(), generalTGFDs.size());
         dataShipperService.uploadTGFD(constantTGFDMap, generalTGFDMap);
         logger.info(config.getNodeName() + " Done");
+        if (dataShipperService.isAmazonMode()) {
+            s3Service.stopInstance();
+        }
     }
 
     public void init(List<PatternTreeNode> patternTreeNodes,

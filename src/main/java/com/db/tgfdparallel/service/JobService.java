@@ -58,8 +58,8 @@ public class JobService {
         Map<Integer, List<RelationshipEdge>> edgesInfo = new HashMap<>();
         IntStream.rangeClosed(1, config.getWorkers().size())
                 .forEach(i -> edgesInfo.put(i, new ArrayList<>()));
-        // TODO: 这里的diameter是不是应该设为1？
         int diameter = 1;
+        AtomicInteger count = new AtomicInteger(0);
 
         for (PatternTreeNode ptn : singlePatternTreeNodes) {
             String centerNodeType = ptn.getPattern().getCenterVertexType();
@@ -67,9 +67,18 @@ public class JobService {
                     .filter(v -> v.getTypes().contains(centerNodeType))
                     .forEach(v -> {
                         List<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
-                        edgesInfo.get(fragmentsForTheInitialLoad.get(v.getUri())).addAll(edges);
+                        int fragmentID = fragmentsForTheInitialLoad.getOrDefault(v.getUri(), 0);
+                        if (fragmentID != 0) {
+                            edgesInfo.get(fragmentID).addAll(edges);
+                        } else {
+                            count.getAndIncrement();
+                        }
                     });
         }
+        for (Map.Entry<Integer, List<RelationshipEdge>> entry : edgesInfo.entrySet()) {
+            logger.info("At {} we have {} edges to be shipped", entry.getKey(), entry.getValue().size());
+        }
+        logger.info("When we try to send edges to all worker, we found there are {} missing edges from splitGraph!!!", count);
 
         return edgesInfo;
     }

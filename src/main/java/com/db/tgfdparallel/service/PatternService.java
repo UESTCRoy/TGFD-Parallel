@@ -246,8 +246,10 @@ public class PatternService {
 
     public double calculateSupport(double numerator, double S, int T) {
         double denominator = S * CombinatoricsUtils.binomialCoefficient(T + 1, 2);
-        if (numerator > denominator)
-            throw new IllegalArgumentException("numerator > denominator");
+        if (numerator > denominator) {
+            return 0.0;
+        }
+//            throw new IllegalArgumentException("numerator > denominator");
         return numerator / denominator;
     }
 

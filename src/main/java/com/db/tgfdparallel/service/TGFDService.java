@@ -53,6 +53,13 @@ public class TGFDService {
                 int minDistance = minMaxPair.getMin();
                 int maxDistance = minMaxPair.getMax();
 
+                double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
+                int numberOfDeltas = MathUtil.computeCombinations(minDistance, maxDistance);
+                double tgfdSupport = calculateTGFDSupport(numberOfDeltas, entities.size(), config.getTimestamp());
+                if (tgfdSupport < supportThreshold) {
+                    continue;
+                }
+
                 // 处理deltaToPairsMap，为后续生成generalTGFDs
                 if (minDistance <= maxDistance) {
                     candidatePairs.add(minMaxPair);
@@ -234,7 +241,11 @@ public class TGFDService {
     public void processConstantTGFD(Map<Integer, List<TGFD>> constantTGFDMap) {
         int numOfPositiveTGFDs = 0;
         int numOfNegativeTGFDs = 0;
-        for (Map.Entry<Integer, List<TGFD>> entry : constantTGFDMap.entrySet()) {
+
+        Iterator<Map.Entry<Integer, List<TGFD>>> iterator = constantTGFDMap.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<Integer, List<TGFD>> entry = iterator.next();
             List<TGFD> constantTGFDsList = entry.getValue();
             Integer hashKey = entry.getKey();
 
@@ -245,7 +256,7 @@ public class TGFDService {
                     numOfPositiveTGFDs++;
                     constantTGFDMap.put(hashKey, Collections.singletonList(tgfd));
                 } else {
-                    constantTGFDMap.remove(hashKey);
+                    iterator.remove();
                 }
             } else {
                 Map<String, List<TGFD>> tgfdMap = constantTGFDsList.stream()
@@ -253,11 +264,13 @@ public class TGFDService {
                             ConstantLiteral constantLiteral = (ConstantLiteral) tgfd.getDependency().getY().get(0);
                             return constantLiteral.getAttrValue();
                         }));
+
                 for (String key : tgfdMap.keySet()) {
                     List<TGFD> tgfds = tgfdMap.get(key);
                     List<TGFD> mergeResult = mergeAndRecreateTGFD(tgfds);
                     tgfdMap.put(key, mergeResult);
                 }
+
                 List<TGFD> combinedList = tgfdMap.values().stream()
                         .flatMap(List::stream)
                         .collect(Collectors.toList());
@@ -265,22 +278,35 @@ public class TGFDService {
                 List<TGFD> constantTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
                 removeOverlappingDeltas(constantTGFDResults);
                 constantTGFDMap.put(hashKey, constantTGFDResults);
+
                 numOfNegativeTGFDs += constantTGFDsList.size() - constantTGFDResults.size();
             }
         }
+
         logger.info("There are {} Positive TGFDs and {} Negative TGFDs", numOfPositiveTGFDs, numOfNegativeTGFDs);
     }
 
     public void processGeneralTGFD(Map<Integer, List<TGFD>> generalTGFDMap) {
         int count = 0;
-        for (Map.Entry<Integer, List<TGFD>> entry : generalTGFDMap.entrySet()) {
+        Iterator<Map.Entry<Integer, List<TGFD>>> iterator = generalTGFDMap.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<Integer, List<TGFD>> entry = iterator.next();
             List<TGFD> tgfds = entry.getValue();
+            Integer key = entry.getKey();
+
             List<TGFD> combinedList = mergeAndRecreateTGFD(tgfds);
             List<TGFD> generalTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
+
             count += generalTGFDResults.size();
-            generalTGFDMap.put(entry.getKey(), generalTGFDResults);
+
+            if (generalTGFDResults.size() != 0) {
+                generalTGFDMap.put(key, generalTGFDResults);
+            } else {
+                iterator.remove();
+            }
         }
-        logger.info("There are {} General TGFD", count);
+        logger.info("There are {} General TGFDs", count);
     }
 
     private List<TGFD> mergeAndRecreateTGFD(List<TGFD> tgfds) {
