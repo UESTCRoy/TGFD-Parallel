@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.*;
 
 @Service
@@ -37,6 +39,10 @@ public class LoaderService {
                 String subjectType = temp[0];
                 String subjectID = temp[1];
 
+//                if (!vertexTypes.contains(subjectType)) {
+//                    continue;
+//                }
+
                 Vertex subjectVertex = getOrCreateVertex(subjectID, subjectType, nodeMap, dataGraph);
 
                 String predicate = stmt.getPredicate().getLocalName().toLowerCase();
@@ -47,9 +53,29 @@ public class LoaderService {
                     objectNodeURI = object.asLiteral().getString().toLowerCase();
                     subjectVertex.getAttributes().add(new Attribute(predicate, objectNodeURI));
                 } else {
-                    temp = processURI(stmt);
-                    if (temp == null) {
-                        continue;
+                    objectNodeURI = object.toString().toLowerCase();
+                    if (objectNodeURI.length() > 16) {
+                        objectNodeURI = objectNodeURI.substring(16);
+                    }
+
+                    temp = objectNodeURI.split("/");
+
+                    if (temp.length != 2) {
+                        StringBuilder sb = new StringBuilder(temp[1]);
+                        for (int i = 2; i < temp.length; i++) {
+                            sb.append("/").append(temp[i]);
+                        }
+                        String combined = sb.toString();
+
+                        String decodedStr = "";
+                        try {
+                            decodedStr = URLDecoder.decode(combined, "UTF-8");
+                        } catch (UnsupportedEncodingException e) {
+                            logger.error("Error decoding URI segment: " + combined, e);
+                        }
+                        temp[1] = decodedStr;
+                    } else {
+                        temp[1] = URLDecoder.decode(temp[1], "UTF-8");
                     }
 
                     String objectType = temp[0];
@@ -174,11 +200,30 @@ public class LoaderService {
 
     private String[] processURI(Statement stmt) {
         String[] temp = stmt.getSubject().getURI().toLowerCase().substring(16).split("/");
-        if (temp.length != 2) {
-            logger.error("Error: Invalid URI format: " + stmt.getSubject().getURI());
-            return null;
+        if (temp.length == 2) {
+            try {
+                temp[1] = URLDecoder.decode(temp[1], "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                logger.error("Error decoding URI segment: " + temp[1], e);
+            }
+            return temp;
         }
-        return temp;
+
+        // Handle cases where temp.length > 2
+        StringBuilder sb = new StringBuilder(temp[1]);
+        for (int i = 2; i < temp.length; i++) {
+            sb.append("/").append(temp[i]);
+        }
+        String combined = sb.toString();
+
+        String decodedStr = "";
+        try {
+            decodedStr = URLDecoder.decode(combined, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            logger.error("Error decoding URI segment: " + combined, e);
+        }
+
+        return new String[]{temp[0], decodedStr};
     }
 
     private Vertex getOrCreateVertex(String id, String type, Map<String, Vertex> nodeMap, Graph<Vertex, RelationshipEdge> dataGraph) {
