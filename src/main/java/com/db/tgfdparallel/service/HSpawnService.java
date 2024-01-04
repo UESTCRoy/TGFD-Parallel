@@ -39,6 +39,8 @@ public class HSpawnService {
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));
         LiteralTree literalTree = new LiteralTree();
 
+        logger.info("Active attributes in pattern: {}", activeAttributesInPattern);
+
         int hSpawnLimit = graph.vertexSet().size();
 
         List<LiteralTreeNode> firstLevelLiteral = activeAttributesInPattern.stream().map(x -> new LiteralTreeNode(null, x)).collect(Collectors.toList());

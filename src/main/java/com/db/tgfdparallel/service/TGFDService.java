@@ -54,9 +54,10 @@ public class TGFDService {
                 int maxDistance = minMaxPair.getMax();
 
                 double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
-                int numberOfDeltas = MathUtil.computeCombinations(minDistance, maxDistance);
+                long numberOfDeltas = MathUtil.computeCombinations(minDistance, maxDistance);
                 double tgfdSupport = calculateTGFDSupport(numberOfDeltas, entities.size(), config.getTimestamp());
                 if (tgfdSupport < supportThreshold) {
+                    logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
                     continue;
                 }
 
@@ -337,7 +338,7 @@ public class TGFDService {
 
     private TGFD updateTGFDWithSupport(TGFD tgfd) {
         Pair delta = tgfd.getDelta();
-        int numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
+        long numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
         double tgfdSupport = calculateTGFDSupport(numberOfDeltas, tgfd.getEntitySize(), config.getTimestamp());
         tgfd.setTgfdSupport(tgfdSupport);
         return tgfd;
@@ -349,7 +350,7 @@ public class TGFDService {
                 .sum();
         tgfds.forEach(tgfd -> {
             Pair delta = tgfd.getDelta();
-            int numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
+            long numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
             double tgfdSupport = calculateTGFDSupport(numberOfDeltas, entitySize, config.getTimestamp());
             tgfd.setTgfdSupport(tgfdSupport);
         });

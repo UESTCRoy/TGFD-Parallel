@@ -42,17 +42,4 @@ public class TgfdParallelApplication implements CommandLineRunner {
         }
     }
 
-//    @Bean
-//    public CommandLineRunner run(AsyncService asyncService) {
-//        return args -> {
-//            CompletableFuture<Void> setupTask = asyncService.setup();
-//            CompletableFuture<Void> shippedDataTask = asyncService.shippedDataGenerator();
-//            CompletableFuture<Void> jobAssignerTask = asyncService.jobAssigner();
-//            CompletableFuture<Void> dataShipperTask = asyncService.dataShipper();
-//
-//            CompletableFuture.allOf(setupTask, shippedDataTask, jobAssignerTask, dataShipperTask).join();
-//
-//            System.out.println("All tasks completed");
-//        };
-//    }
 }
