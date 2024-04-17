@@ -1,5 +1,7 @@
 package com.db.tgfdparallel.utils;
 
+import java.util.List;
+
 public class MathUtil {
     public static long computeCombinations(int lowerBound, int upperBound) {
         int n = upperBound - lowerBound + 1;
@@ -16,7 +18,14 @@ public class MathUtil {
         return result;
     }
 
+    public static int countPairs(List<Integer> list) {
+        long positiveCount = list.stream()
+                .filter(number -> number > 0)
+                .count();
+        return (int) (positiveCount * (positiveCount - 1) / 2);
+    }
+
     public static void main(String[] args) {
-        System.out.println(computeCombinations(1, 15));
+        System.out.println(computeCombinations(1, 6));
     }
 }

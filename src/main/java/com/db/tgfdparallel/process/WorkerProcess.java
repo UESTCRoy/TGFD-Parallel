@@ -254,7 +254,7 @@ public class WorkerProcess {
                     .flatMap(v -> v.getTypes().stream())
                     .collect(Collectors.toSet());
 
-            // Diameter 根据level变化
+            level = Math.min(level, 2);
             Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
             if (snapshotID != 0) {
                 subgraph = graphService.updateChangedGraph(nodeMap, subgraph);
@@ -263,13 +263,13 @@ public class WorkerProcess {
                     graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
 
             if (results.isomorphismExists()) {
-                long startTime = System.currentTimeMillis();
+//                long startTime = System.currentTimeMillis();
                 Set<Set<ConstantLiteral>> matches = new HashSet<>();
                 numOfMatchesInTimestamp += patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
                         entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
-                long endTime = System.currentTimeMillis();
+//                long endTime = System.currentTimeMillis();
                 matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
-                logger.info("Found {} matches for pattern {} in snapshot {} in {} ms", numOfMatchesInTimestamp, job.getPatternTreeNode().getPattern().getPattern(), snapshotID, endTime - startTime);
+//                logger.info("Found {} matches for pattern {} in snapshot {} in {} ms", numOfMatchesInTimestamp, job.getPatternTreeNode().getPattern().getPattern(), snapshotID, endTime - startTime);
             }
         }
         return numOfMatchesInTimestamp;

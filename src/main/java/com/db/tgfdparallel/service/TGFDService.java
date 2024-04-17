@@ -54,8 +54,9 @@ public class TGFDService {
                 int maxDistance = minMaxPair.getMax();
 
                 double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
-                long numberOfDeltas = MathUtil.computeCombinations(minDistance, maxDistance);
-                double tgfdSupport = calculateTGFDSupport(numberOfDeltas, entities.size(), config.getTimestamp());
+                long numberOfPairs = MathUtil.countPairs(values);
+                // TODO: 这里并不是用numberOfDeltas, 而是matches的pair数量
+                double tgfdSupport = calculateTGFDSupport(numberOfPairs, entities.size(), config.getTimestamp());
                 if (tgfdSupport < supportThreshold) {
                     logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
                     continue;
