@@ -9,10 +9,12 @@ import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -140,10 +142,31 @@ public class WorkerProcess {
                         .mapToInt(List::size)
                         .sum();
                 logger.info("We got {} new jobs to find new pattern's matches", numOfNewJobs);
+                if (level == 1 && numOfNewJobs < 100 * config.getTimestamp()) {
+                    logger.info("The number of new jobs is too small, skip this pattern");
+                    newPattern.setPruned(true);
+                    continue;
+                }
+
+                List<CompletableFuture<Integer>> futures = new ArrayList<>();
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
-                    int numOfMatches = runSnapshot(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
-                    logger.info("We got {} matches for pattern: {} at timestamp: {}", numOfMatches, pattern, superstep);
+                    CompletableFuture<Integer> future = runSnapshotAsync(superstep, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap);
+                    futures.add(future);
+                }
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+                List<Set<Set<ConstantLiteral>>> matchesSet = matchesPerTimestampsByPTN.get(newPattern);
+                if (matchesSet != null && !matchesSet.isEmpty()) {
+                    int timestampCount = config.getTimestamp();
+                    for (int i = 0; i < timestampCount; i++) {
+                        Set<Set<ConstantLiteral>> sets = matchesSet.get(i);
+                        if (sets != null) {
+                            logger.info("The number of matches for pattern {} in timestamp {} is {}", pattern, i, sets.size());
+                        } else {
+                            logger.info("No matches found for pattern {} in timestamp {}", pattern, i);
+                        }
+                    }
                 }
 
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
@@ -204,10 +227,19 @@ public class WorkerProcess {
         }
     }
 
+    @Async
+    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
+                                                       Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
+                                                       Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
+                                                       Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+        return CompletableFuture.completedFuture(
+                runSnapshot(snapshotID, loader, newJobsList, matchesPerTimestampsByPTN, level, entityURIsByPTN, vertexTypesToActiveAttributesMap)
+        );
+    }
+
     public int runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                            Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        long startTime = System.currentTimeMillis();
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         Map<String, Vertex> nodeMap = loader.getGraph().getNodeMap();
         Set<Vertex> verticesInGraph = new HashSet<>(graph.vertexSet());
@@ -222,7 +254,7 @@ public class WorkerProcess {
                     .flatMap(v -> v.getTypes().stream())
                     .collect(Collectors.toSet());
 
-            // Diameter 根据level变化
+            level = Math.min(level, 2);
             Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, job.getCenterNode(), level, validTypes);
             if (snapshotID != 0) {
                 subgraph = graphService.updateChangedGraph(nodeMap, subgraph);
@@ -231,12 +263,13 @@ public class WorkerProcess {
                     graphService.checkIsomorphism(subgraph, job.getPatternTreeNode().getPattern(), false);
 
             if (results.isomorphismExists()) {
+//                long startTime = System.currentTimeMillis();
                 Set<Set<ConstantLiteral>> matches = new HashSet<>();
-//                logger.info("Start Matching at {}", LocalDateTime.now());
                 numOfMatchesInTimestamp += patternService.extractMatches(results.getMappings(), matches, job.getPatternTreeNode(),
                         entityURIsByPTN.get(job.getPatternTreeNode()), snapshotID, vertexTypesToActiveAttributesMap);
-//                logger.info("End Matching at {}", LocalDateTime.now());
+//                long endTime = System.currentTimeMillis();
                 matchesPerTimestampsByPTN.get(job.getPatternTreeNode()).get(snapshotID).addAll(matches);
+//                logger.info("Found {} matches for pattern {} in snapshot {} in {} ms", numOfMatchesInTimestamp, job.getPatternTreeNode().getPattern().getPattern(), snapshotID, endTime - startTime);
             }
         }
         return numOfMatchesInTimestamp;

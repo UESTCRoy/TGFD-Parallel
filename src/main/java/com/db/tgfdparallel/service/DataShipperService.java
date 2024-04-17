@@ -53,21 +53,28 @@ public class DataShipperService {
                 String srcVertex = edge.getSource().getUri();
                 String dstVertex = edge.getTarget().getUri();
 
-                if (fragments.get(srcVertex) != fragmentID && fragments.get(dstVertex) == fragmentID) {
-                    batchDataToBeShipped.get(fragments.get(srcVertex))
-                            .get(fragmentID)
-                            .add(new SimpleEdge(edge));
-                } else if (fragments.get(srcVertex) == fragmentID && fragments.get(dstVertex) != fragmentID) {
-                    batchDataToBeShipped.get(fragments.get(dstVertex))
-                            .get(fragmentID)
-                            .add(new SimpleEdge(edge));
-                } else if (fragments.get(srcVertex) != fragmentID && fragments.get(dstVertex) != fragmentID) {
-                    batchDataToBeShipped.get(fragments.get(dstVertex))
-                            .get(fragmentID)
-                            .add(new SimpleEdge(edge));
-                    batchDataToBeShipped.get(fragments.get(srcVertex))
-                            .get(fragmentID)
-                            .add(new SimpleEdge(edge));
+                // 使用临时变量存储fragments.get()的结果
+                Integer srcFragmentID = fragments.get(srcVertex);
+                Integer dstFragmentID = fragments.get(dstVertex);
+
+                // 检查srcFragmentID和dstFragmentID是否为null
+                if (srcFragmentID != null && dstFragmentID != null) {
+                    if (!srcFragmentID.equals(fragmentID) && dstFragmentID.equals(fragmentID)) {
+                        batchDataToBeShipped.get(srcFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
+                    } else if (srcFragmentID.equals(fragmentID) && !dstFragmentID.equals(fragmentID)) {
+                        batchDataToBeShipped.get(dstFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
+                    } else if (!srcFragmentID.equals(fragmentID) && !dstFragmentID.equals(fragmentID)) {
+                        batchDataToBeShipped.get(dstFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
+                        batchDataToBeShipped.get(srcFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
+                    }
                 }
 
                 count++;

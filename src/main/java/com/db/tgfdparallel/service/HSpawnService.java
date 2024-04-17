@@ -13,7 +13,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-
 @Service
 public class HSpawnService {
     private static final Logger logger = LoggerFactory.getLogger(HSpawnService.class);
@@ -28,6 +27,7 @@ public class HSpawnService {
         this.tgfdService = tgfdService;
     }
 
+    // TODO: 改造成异步的方式
     public List<List<TGFD>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
                                           List<Set<Set<ConstantLiteral>>> matchesPerTimestamps) {
         List<List<TGFD>> result = Collections.nCopies(2, new ArrayList<TGFD>())
@@ -38,6 +38,8 @@ public class HSpawnService {
         // TODO: 如果pth中的vertex 并没有active attribute，我们是否应该过滤掉？
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));
         LiteralTree literalTree = new LiteralTree();
+
+        logger.info("Active attributes in pattern: {}", activeAttributesInPattern);
 
         int hSpawnLimit = graph.vertexSet().size();
 
