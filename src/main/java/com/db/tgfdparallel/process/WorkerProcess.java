@@ -91,7 +91,7 @@ public class WorkerProcess {
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
         Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN = new HashMap<>();
-        Map<Integer, List<Job>> assignedJobsBySnapshot = new HashMap<>();
+        Map<Integer, Set<Job>> assignedJobsBySnapshot = new HashMap<>();
         init(patternTreeNodes, matchesPerTimestampsByPTN, entityURIsByPTN);
 
         // run first level matches
@@ -136,9 +136,9 @@ public class WorkerProcess {
                 }
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
-                Map<Integer, List<Job>> newJobsList = jobService.createNewJobsList(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
+                Map<Integer, Set<Job>> newJobsList = jobService.createNewJobsSet(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
                 int numOfNewJobs = newJobsList.values().stream()
-                        .mapToInt(List::size)
+                        .mapToInt(Set::size)
                         .sum();
                 logger.info("We got {} new jobs to find new pattern's matches", numOfNewJobs);
                 if (level == 1 && numOfNewJobs < 100 * config.getTimestamp()) {
@@ -227,7 +227,7 @@ public class WorkerProcess {
     }
 
     @Async
-    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
+    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, GraphLoader loader, Map<Integer, Set<Job>> newJobsList,
                                                        Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                                                        Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                        Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
@@ -236,7 +236,7 @@ public class WorkerProcess {
         );
     }
 
-    public int runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, List<Job>> newJobsList,
+    public int runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, Set<Job>> newJobsList,
                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                            Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();

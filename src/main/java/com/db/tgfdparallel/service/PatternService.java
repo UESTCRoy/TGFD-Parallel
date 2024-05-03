@@ -77,11 +77,11 @@ public class PatternService {
                                                 Map<String, PatternTreeNode> singlePatternTreeNodesMap,
                                                 Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                 Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
-                                                Map<Integer, List<Job>> assignedJobsBySnapshot) {
+                                                Map<Integer, Set<Job>> assignedJobsBySnapshot) {
         // We start from the singleNodeVertex, so the initial diameter is set to 0.
         final int diameter = 0;
         AtomicInteger jobID = new AtomicInteger(0);
-        List<Job> jobsForSnapshot = new ArrayList<>();
+        Set<Job> jobsForSnapshot = new HashSet<>();
         assignedJobsBySnapshot.put(snapshotID, jobsForSnapshot);
         Graph<Vertex, RelationshipEdge> graph = dataGraph.getGraph();
 

@@ -118,11 +118,11 @@ public class JobService {
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
     }
 
-    public Map<Integer, List<Job>> createNewJobsList(Map<Integer, List<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
-        Map<Integer, List<Job>> newJobsList = new HashMap<>();
+    public Map<Integer, Set<Job>> createNewJobsSet(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+        Map<Integer, Set<Job>> newJobsSet = new HashMap<>();
         for (int index : assignedJobsBySnapshot.keySet()) {
-            List<Job> newJobsAtIndex = new ArrayList<>();
-            List<Job> additionalJobs = new ArrayList<>();
+            Set<Job> newJobsAtIndex = new HashSet<>();
+            Set<Job> additionalJobs = new HashSet<>();
             for (Job job : assignedJobsBySnapshot.get(index)) {
                 if (job.getPatternTreeNode().getPattern().equals(pattern)) {
                     Job newJob = new Job(job.getID(), job.getCenterNode(), newPattern);
@@ -130,11 +130,10 @@ public class JobService {
                     additionalJobs.add(newJob);
                 }
             }
-            // TODO: Map<Integer, Set<Job>> assignedJobsBySnapshot 改成 Map<Integer, Map<Integer, Job>> assignedJobsBySnapshot
-            assignedJobsBySnapshot.get(index).addAll(additionalJobs);
-            newJobsList.put(index, newJobsAtIndex);
+            assignedJobsBySnapshot.get(index).addAll(additionalJobs); // Note: This needs to change if assignedJobsBySnapshot should also use Set
+            newJobsSet.put(index, newJobsAtIndex);
         }
-        return newJobsList;
+        return newJobsSet;
     }
 
 }
