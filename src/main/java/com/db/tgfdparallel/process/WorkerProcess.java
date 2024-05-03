@@ -51,7 +51,6 @@ public class WorkerProcess {
         activeMQService.sendStatus();
 
         // Receive the histogram data from the coordinator
-        // TODO: histogram字段并不全部有用
         long histogramStartTime = System.currentTimeMillis();
         ProcessedHistogramData histogramData = dataShipperService.receiveHistogramData();
         long histogramEndTime = System.currentTimeMillis();
@@ -70,7 +69,7 @@ public class WorkerProcess {
         logger.info("Received singlePatternTreeNodes From Coordinator, {} ms", singlePatternEndTime - singlePatternStartTime);
 
         // Load the first snapshot
-        String dataPath = dataShipperService.awsWorkerDataPreparation();
+        String dataPath = dataShipperService.workerDataPreparation();
         GraphLoader graphLoader = graphService.loadFirstSnapshot(dataPath, vertexTypes);
         logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
                 graphLoader.getGraph().getGraph().edgeSet().size(),

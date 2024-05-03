@@ -36,49 +36,28 @@ public class DataShipperService {
         Map<Integer, Map<Integer, List<SimpleEdge>>> batchDataToBeShipped = new HashMap<>();
         Map<Integer, List<String>> listOfFiles = new HashMap<>();
 
-        for (int i : edgesToBeShipped.keySet()) {
-            Map<Integer, List<SimpleEdge>> innerMap = new HashMap<>();
-            for (int j : edgesToBeShipped.keySet()) {
-                if (i != j) {
-                    innerMap.put(j, new ArrayList<>());
-                }
-            }
-            batchDataToBeShipped.put(i, innerMap);
-        }
-
         int count = 0;
 
-        for (int fragmentID : edgesToBeShipped.keySet()) {
-            for (RelationshipEdge edge : edgesToBeShipped.get(fragmentID)) {
+        for (Map.Entry<Integer, List<RelationshipEdge>> entry : edgesToBeShipped.entrySet()) {
+            int fragmentID = entry.getKey();
+
+            for (RelationshipEdge edge : entry.getValue()) {
                 String srcVertex = edge.getSource().getUri();
                 String dstVertex = edge.getTarget().getUri();
 
-                // 使用临时变量存储fragments.get()的结果
                 Integer srcFragmentID = fragments.get(srcVertex);
                 Integer dstFragmentID = fragments.get(dstVertex);
 
-                // 检查srcFragmentID和dstFragmentID是否为null
-                if (srcFragmentID != null && dstFragmentID != null) {
-                    if (!srcFragmentID.equals(fragmentID) && dstFragmentID.equals(fragmentID)) {
-                        batchDataToBeShipped.get(srcFragmentID)
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
-                    } else if (srcFragmentID.equals(fragmentID) && !dstFragmentID.equals(fragmentID)) {
-                        batchDataToBeShipped.get(dstFragmentID)
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
-                    } else if (!srcFragmentID.equals(fragmentID) && !dstFragmentID.equals(fragmentID)) {
-                        batchDataToBeShipped.get(dstFragmentID)
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
-                        batchDataToBeShipped.get(srcFragmentID)
-                                .get(fragmentID)
-                                .add(new SimpleEdge(edge));
+                if (srcFragmentID != null && dstFragmentID != null && !srcFragmentID.equals(dstFragmentID)) {
+                    if (!srcFragmentID.equals(fragmentID)) {
+                        addEdgeToBatch(batchDataToBeShipped, srcFragmentID, fragmentID, edge);
+                    }
+                    if (!dstFragmentID.equals(fragmentID)) {
+                        addEdgeToBatch(batchDataToBeShipped, dstFragmentID, fragmentID, edge);
                     }
                 }
 
                 count++;
-
                 if (count >= batchSize) {
                     sendEdgesToWorkersForShipment(batchDataToBeShipped, listOfFiles);
                     clearBatchData(batchDataToBeShipped);
@@ -92,6 +71,13 @@ public class DataShipperService {
             clearBatchData(batchDataToBeShipped);
         }
         return listOfFiles;
+    }
+
+    private void addEdgeToBatch(Map<Integer, Map<Integer, List<SimpleEdge>>> batchDataToBeShipped, Integer targetFragmentID, Integer fragmentID, RelationshipEdge edge) {
+        batchDataToBeShipped
+                .computeIfAbsent(targetFragmentID, k -> new HashMap<>())
+                .computeIfAbsent(fragmentID, k -> new ArrayList<>())
+                .add(new SimpleEdge(edge));
     }
 
     public void sendEdgesToWorkersForShipment(Map<Integer, Map<Integer, List<SimpleEdge>>> dataToBeShipped, Map<Integer, List<String>> listOfFiles) {
@@ -171,18 +157,8 @@ public class DataShipperService {
 
     public void sendHistogramData(ProcessedHistogramData data) {
         if (isAmazonMode()) {
-//            s3Service.uploadObject(config.getBucketName(), "vertexHistogram", data.getVertexHistogram());
-//            s3Service.uploadObject(config.getBucketName(), "activeAttributesSet", data.getActiveAttributesSet());
-//            s3Service.uploadObject(config.getBucketName(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
-//            s3Service.uploadObject(config.getBucketName(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
-//            s3Service.uploadObject(config.getBucketName(), "sortedVertexHistogram", data.getSortedVertexHistogram());
             s3Service.uploadObject("processedHistogramData", data);
         } else {
-//            hdfsService.uploadObject(config.getHDFSPath(), "vertexHistogram", data.getVertexHistogram());
-//            hdfsService.uploadObject(config.getHDFSPath(), "activeAttributesSet", data.getActiveAttributesSet());
-//            hdfsService.uploadObject(config.getHDFSPath(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
-//            hdfsService.uploadObject(config.getHDFSPath(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
-//            hdfsService.uploadObject(config.getHDFSPath(), "sortedVertexHistogram", data.getSortedVertexHistogram());
             hdfsService.uploadObject(config.getHDFSPath(), "processedHistogramData", data);
         }
 
@@ -409,7 +385,7 @@ public class DataShipperService {
         logger.info("Finish Download From S3 to Instance");
     }
 
-    public String awsWorkerDataPreparation() {
+    public String workerDataPreparation() {
         String dataPath = config.getDataPath();
         if (isAmazonMode()) {
             String fileName = getFileNameFromPath(dataPath);
