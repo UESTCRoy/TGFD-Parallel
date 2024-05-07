@@ -56,38 +56,33 @@ public class JobService {
     // Record which partition each vertex is assigned to, and assign edges accordingly.
     public Map<Integer, List<RelationshipEdge>> defineEdgesToBeShipped(Graph<Vertex, RelationshipEdge> graph, Map<String, Integer> fragmentsForTheInitialLoad,
                                                                        List<PatternTreeNode> singlePatternTreeNodes) {
-        int numWorkers = config.getWorkers().size();
-        Map<Integer, List<RelationshipEdge>> edgesInfo = new HashMap<>(numWorkers);
-        IntStream.rangeClosed(1, numWorkers)
+        Map<Integer, List<RelationshipEdge>> edgesInfo = new HashMap<>();
+        IntStream.rangeClosed(1, config.getWorkers().size())
                 .forEach(i -> edgesInfo.put(i, new ArrayList<>()));
+        int diameter = 1;
+        AtomicInteger count = new AtomicInteger(0);
 
-        AtomicInteger missingEdgeCount = new AtomicInteger(0);
-        final int diameter = 1;
-
-        singlePatternTreeNodes.parallelStream()
-                .flatMap(ptn -> {
-                    String centerNodeType = ptn.getPattern().getCenterVertexType();
-                    return graph.vertexSet().stream()
-                            .filter(v -> v.getTypes().contains(centerNodeType))
-                            .map(v -> new AbstractMap.SimpleEntry<>(v, graphService.getEdgesWithinDiameter(graph, v, diameter)));
-                })
-                .forEach(entry -> {
-                    Vertex v = entry.getKey();
-                    List<RelationshipEdge> edges = entry.getValue();
-                    int fragmentID = fragmentsForTheInitialLoad.getOrDefault(v.getUri(), 0);
-                    if (fragmentID != 0) {
-                        edgesInfo.get(fragmentID).addAll(edges);
-                    } else {
-                        missingEdgeCount.incrementAndGet();
-                    }
-                });
-
-        edgesInfo.forEach((key, value) -> logger.info("At {} we have {} edges to be shipped", key, value.size()));
-        logger.info("When we try to send edges to all workers, we found there are {} missing edges from splitGraph!!!", missingEdgeCount.get());
+        for (PatternTreeNode ptn : singlePatternTreeNodes) {
+            String centerNodeType = ptn.getPattern().getCenterVertexType();
+            graph.vertexSet().stream()
+                    .filter(v -> v.getTypes().contains(centerNodeType))
+                    .forEach(v -> {
+                        List<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
+                        int fragmentID = fragmentsForTheInitialLoad.getOrDefault(v.getUri(), 0);
+                        if (fragmentID != 0) {
+                            edgesInfo.get(fragmentID).addAll(edges);
+                        } else {
+                            count.getAndIncrement();
+                        }
+                    });
+        }
+        for (Map.Entry<Integer, List<RelationshipEdge>> entry : edgesInfo.entrySet()) {
+            logger.info("At {} we have {} edges to be shipped", entry.getKey(), entry.getValue().size());
+        }
+        logger.info("When we try to send edges to all worker, we found there are {} missing edges from splitGraph!!!", count);
 
         return edgesInfo;
     }
-
 
     // TODO: we might not need this function, because worker doesn't need jobs, it could only based on singleNodePattern
     public void jobAssigner(Map<Integer, List<Job>> jobsByFragmentID) {
@@ -130,7 +125,7 @@ public class JobService {
                     additionalJobs.add(newJob);
                 }
             }
-            assignedJobsBySnapshot.get(index).addAll(additionalJobs); // Note: This needs to change if assignedJobsBySnapshot should also use Set
+            assignedJobsBySnapshot.get(index).addAll(additionalJobs);
             newJobsSet.put(index, newJobsAtIndex);
         }
         return newJobsSet;

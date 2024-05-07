@@ -242,7 +242,7 @@ public class PatternService {
         return numerator / denominator;
     }
 
-    public List<VSpawnPattern> vSpawnGenerator(Map<String, Set<String>> vertexTypesToActiveAttributesMap, List<String> edgeData, PatternTree patternTree, int level) {
+    public List<VSpawnPattern> vSpawnGenerator(List<String> edgeData, PatternTree patternTree, int level) {
         List<VSpawnPattern> vSpawnPatternList = new ArrayList<>();
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
@@ -253,21 +253,23 @@ public class PatternService {
             }
             for (String edge : edgeData) {
                 VSpawnPattern pattern = new VSpawnPattern();
-                // TODO: if ptn is pruned, we skip it.
+
                 String sourceVertexType = edge.split(" ")[0];
                 String targetVertexType = edge.split(" ")[2];
                 String label = edge.split(" ")[1];
 
+                // TODO: 提前过滤掉edge信息：1. sourceVertexType和targetVertexType相同；2. sourceVertexType和targetVertexType没有active attributes
                 if (sourceVertexType.equals(targetVertexType)) {
                     logger.info("Source vertex type is equal to target vertex type. Skipping edge: " + edge);
                     continue;
                 }
 
-                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType) || !vertexTypesToActiveAttributesMap.containsKey(sourceVertexType)) {
-                    logger.info("Target and Source vertex type has no active attributes. Skipping edge: " + edge);
-                    continue;
-                }
+//                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType) || !vertexTypesToActiveAttributesMap.containsKey(sourceVertexType)) {
+//                    logger.info("Target and Source vertex type has no active attributes. Skipping edge: " + edge);
+//                    continue;
+//                }
 
+                // filter out duplicate edges
                 if (checkEdgeProperties(ptn.getPattern(), label, sourceVertexType, targetVertexType)) {
                     logger.info("Duplicate edge. Skipping edge: " + edge);
                     continue;
@@ -300,7 +302,6 @@ public class PatternService {
                         targetVertex = new Vertex(targetVertexType);
                         addVertex(newPattern, targetVertex);
                     } else {
-                        // TODO: 这步的意义？
                         for (Vertex vertex : newPattern.getPattern().vertexSet()) {
                             if (vertex.getTypes().contains(targetVertexType)) {
                                 targetVertex.setMarked(true);
@@ -325,12 +326,11 @@ public class PatternService {
 
                     addEdge(graph, sourceVertex, targetVertex, newEdge);
 
-                    // TODO: 待优化：比较new pattern与之前pattern是否isomorphism，判断是否有存在必要
-//                    if (!isIsomorphicPattern(newPattern, Util.patternTree)) {
-//                        pv.setMarked(true);
-//                        System.out.println("Skip. Candidate pattern is an isomorph of existing pattern");
-//                        continue;
-//                    }
+                    if (isIsomorphicPattern(newPattern, vSpawnPatternList)) {
+//                        v.setMarked(true);
+                        System.out.println("Skip. Candidate pattern is an isomorph of existing pattern");
+                        continue;
+                    }
 
                     PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes, level);
                     pattern.setNewPattern(patternTreeNode);
@@ -343,19 +343,12 @@ public class PatternService {
     }
 
     public boolean checkEdgeProperties(VF2PatternGraph pattern, String edgeType, String sourceType, String targetType) {
-        boolean isEdgeTypeSpecified = edgeType != null && !edgeType.isEmpty();
         for (RelationshipEdge edge : pattern.getPattern().edgeSet()) {
             boolean sourceMatches = edge.getSource().getTypes().contains(sourceType);
             boolean targetMatches = edge.getTarget().getTypes().contains(targetType);
 
-            if (isEdgeTypeSpecified) {
-                if (edge.getLabel().equalsIgnoreCase(edgeType) && sourceMatches && targetMatches) {
-                    return true;
-                }
-            } else {
-                if ((sourceMatches && targetMatches) || (edge.getSource().getTypes().contains(targetType) && edge.getTarget().getTypes().contains(sourceType))) {
-                    return true;
-                }
+            if (edge.getLabel().equalsIgnoreCase(edgeType) && sourceMatches && targetMatches) {
+                return true;
             }
         }
         return false;
@@ -367,6 +360,22 @@ public class PatternService {
                 .filter(v -> v.getTypes().contains(vertexType))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private boolean isIsomorphicPattern(VF2PatternGraph newPattern, List<VSpawnPattern> vSpawnPatternList) {
+        Set<String> newEdges = newPattern.getPattern().edgeSet().stream()
+                .map(Object::toString)
+                .collect(Collectors.toSet());
+
+        for (VSpawnPattern vSpawnPattern : vSpawnPatternList) {
+            Set<String> existingEdges = vSpawnPattern.getNewPattern().getPattern().getPattern().edgeSet().stream()
+                    .map(Object::toString)
+                    .collect(Collectors.toSet());
+            if (newEdges.containsAll(existingEdges)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public VF2PatternGraph copyGraph(Graph<Vertex, RelationshipEdge> graph) {

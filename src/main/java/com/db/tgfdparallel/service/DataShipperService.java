@@ -36,28 +36,49 @@ public class DataShipperService {
         Map<Integer, Map<Integer, List<SimpleEdge>>> batchDataToBeShipped = new HashMap<>();
         Map<Integer, List<String>> listOfFiles = new HashMap<>();
 
+        for (int i : edgesToBeShipped.keySet()) {
+            Map<Integer, List<SimpleEdge>> innerMap = new HashMap<>();
+            for (int j : edgesToBeShipped.keySet()) {
+                if (i != j) {
+                    innerMap.put(j, new ArrayList<>());
+                }
+            }
+            batchDataToBeShipped.put(i, innerMap);
+        }
+
         int count = 0;
 
-        for (Map.Entry<Integer, List<RelationshipEdge>> entry : edgesToBeShipped.entrySet()) {
-            int fragmentID = entry.getKey();
-
-            for (RelationshipEdge edge : entry.getValue()) {
+        for (int fragmentID : edgesToBeShipped.keySet()) {
+            for (RelationshipEdge edge : edgesToBeShipped.get(fragmentID)) {
                 String srcVertex = edge.getSource().getUri();
                 String dstVertex = edge.getTarget().getUri();
 
+                // 使用临时变量存储fragments.get()的结果
                 Integer srcFragmentID = fragments.get(srcVertex);
                 Integer dstFragmentID = fragments.get(dstVertex);
 
-                if (srcFragmentID != null && dstFragmentID != null && !srcFragmentID.equals(dstFragmentID)) {
-                    if (!srcFragmentID.equals(fragmentID)) {
-                        addEdgeToBatch(batchDataToBeShipped, srcFragmentID, fragmentID, edge);
-                    }
-                    if (!dstFragmentID.equals(fragmentID)) {
-                        addEdgeToBatch(batchDataToBeShipped, dstFragmentID, fragmentID, edge);
+                // 检查srcFragmentID和dstFragmentID是否为null
+                if (srcFragmentID != null && dstFragmentID != null) {
+                    if (!srcFragmentID.equals(fragmentID) && dstFragmentID.equals(fragmentID)) {
+                        batchDataToBeShipped.get(srcFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
+                    } else if (srcFragmentID.equals(fragmentID) && !dstFragmentID.equals(fragmentID)) {
+                        batchDataToBeShipped.get(dstFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
+                    } else if (!srcFragmentID.equals(fragmentID) && !dstFragmentID.equals(fragmentID)) {
+                        batchDataToBeShipped.get(dstFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
+                        batchDataToBeShipped.get(srcFragmentID)
+                                .get(fragmentID)
+                                .add(new SimpleEdge(edge));
                     }
                 }
 
                 count++;
+
                 if (count >= batchSize) {
                     sendEdgesToWorkersForShipment(batchDataToBeShipped, listOfFiles);
                     clearBatchData(batchDataToBeShipped);
@@ -65,19 +86,11 @@ public class DataShipperService {
                 }
             }
         }
-
         if (count > 0) {
             sendEdgesToWorkersForShipment(batchDataToBeShipped, listOfFiles);
             clearBatchData(batchDataToBeShipped);
         }
         return listOfFiles;
-    }
-
-    private void addEdgeToBatch(Map<Integer, Map<Integer, List<SimpleEdge>>> batchDataToBeShipped, Integer targetFragmentID, Integer fragmentID, RelationshipEdge edge) {
-        batchDataToBeShipped
-                .computeIfAbsent(targetFragmentID, k -> new HashMap<>())
-                .computeIfAbsent(fragmentID, k -> new ArrayList<>())
-                .add(new SimpleEdge(edge));
     }
 
     public void sendEdgesToWorkersForShipment(Map<Integer, Map<Integer, List<SimpleEdge>>> dataToBeShipped, Map<Integer, List<String>> listOfFiles) {

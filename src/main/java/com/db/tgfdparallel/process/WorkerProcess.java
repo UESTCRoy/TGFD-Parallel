@@ -57,6 +57,7 @@ public class WorkerProcess {
         logger.info("Received Histogram From Coordinator, {} ms", histogramEndTime - histogramStartTime);
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
         List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram().stream().map(FrequencyStatistics::getType).collect(Collectors.toList());
+        // TODO: Edge Data Filter
         Map<String, Integer> vertexHistogram = histogramData.getSortedVertexHistogram().stream()
                 .collect(Collectors.toMap(FrequencyStatistics::getType, FrequencyStatistics::getFrequency));
         Set<String> vertexTypes = histogramData.getSortedVertexHistogram().stream()
@@ -78,15 +79,15 @@ public class WorkerProcess {
         // By using the change file, generate new loader for each snapshot
         GraphLoader[] loaders = new GraphLoader[config.getTimestamp()];
         loaders[0] = graphLoader;
-        graphService.updateFirstSnapshot(graphLoader);
+//        graphService.updateFirstSnapshot(graphLoader);
 
-        List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
-        for (int i = 0; i < changesData.size(); i++) {
-            // I create a deep copy of previous loader (用前一个graph，而不是第一个graph)
-            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(loaders[i]);
-            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), copyOfFirstLoader);
-            loaders[i + 1] = changeLoader;
-        }
+//        List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
+//        for (int i = 0; i < changesData.size(); i++) {
+//            // I create a deep copy of previous loader (用前一个graph，而不是第一个graph)
+//            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(loaders[i]);
+//            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), copyOfFirstLoader);
+//            loaders[i + 1] = changeLoader;
+//        }
 
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
@@ -100,10 +101,10 @@ public class WorkerProcess {
                         node -> node.getPattern().getCenterVertexType(),
                         node -> node
                 ));
-        for (int i = 0; i < config.getTimestamp(); i++) {
-            patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
-                    patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
-        }
+//        for (int i = 0; i < config.getTimestamp(); i++) {
+//            patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
+//                    patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
+//        }
 
         List<TGFD> constantTGFDs = new ArrayList<>();
         List<TGFD> generalTGFDs = new ArrayList<>();
@@ -115,7 +116,7 @@ public class WorkerProcess {
         patternTree.getTree().get(0).addAll(patternTreeNodes);
         int level = 0;
         while (level < config.getK()) {
-            List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(vertexTypesToActiveAttributesMap, edgeData, patternTree, level)
+            List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(edgeData, patternTree, level)
                     .stream()
                     .filter(x -> x.getNewPattern() != null)
                     .collect(Collectors.toList());
