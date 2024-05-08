@@ -56,8 +56,8 @@ public class WorkerProcess {
         long histogramEndTime = System.currentTimeMillis();
         logger.info("Received Histogram From Coordinator, {} ms", histogramEndTime - histogramStartTime);
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
-        List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram().stream().map(FrequencyStatistics::getType).collect(Collectors.toList());
-        // TODO: Edge Data Filter
+        List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram();
+
         Map<String, Integer> vertexHistogram = histogramData.getSortedVertexHistogram().stream()
                 .collect(Collectors.toMap(FrequencyStatistics::getType, FrequencyStatistics::getFrequency));
         Set<String> vertexTypes = histogramData.getSortedVertexHistogram().stream()

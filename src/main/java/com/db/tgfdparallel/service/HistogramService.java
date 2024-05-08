@@ -103,12 +103,43 @@ public class HistogramService {
     public ProcessedHistogramData performingRecordKeeping(HistogramData data) {
         Set<String> activeAttributesSet = setActiveAttributeSet(data.getAttrDistributionMap());
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = vertexTypesToActiveAttributesMap(data.getVertexTypesToAttributesMap(), activeAttributesSet);
-        List<FrequencyStatistics> sortedFrequentEdgesHistogram = setSortedFrequentEdgeHistogram(data.getEdgeTypesHistogram(), data.getVertexTypesHistogram());
+        List<FrequencyStatistics> sortedFrequentEdgesHistogram = setSortedFrequentEdgeHistogram(data.getEdgeTypesHistogram());
         List<FrequencyStatistics> sortedVertexHistogram = setSortedFrequentVerticesUsingFrequentEdges(sortedFrequentEdgesHistogram, data.getVertexTypesHistogram());
+
+        Set<String> seenLabels = new HashSet<>();
+        List<String> frequentEdgesData = sortedFrequentEdgesHistogram.stream()
+                .map(FrequencyStatistics::getType)
+                .filter(edge -> {
+                    String[] parts = edge.split(" ");
+                    String sourceVertexType = parts[0];
+                    String targetVertexType = parts[2];
+                    String label = edge.split(" ")[1];
+
+                    // Check if the label has already been processed
+                    if (!seenLabels.add(label)) { // add returns false if the item was already in the set
+                        logger.info("Label {} already exists, skip this edge: {}", label, edge);
+                        return false;
+                    }
+
+                    // Check if source and target vertex types are the same
+                    if (sourceVertexType.equals(targetVertexType)) {
+                        logger.info("The sourceVertexType and targetVertexType are the same, skip this edge: {}", edge);
+                        return false;
+                    }
+
+                    // Check if both source and target vertex types have active attributes
+                    if (!vertexTypesToActiveAttributesMap.containsKey(sourceVertexType) || !vertexTypesToActiveAttributesMap.containsKey(targetVertexType)) {
+                        logger.info("The sourceVertexType or targetVertexType doesn't have active attributes, skip this edge: {}", edge);
+                        return false;
+                    }
+
+                    return true;
+                })
+                .collect(Collectors.toList());
 
         ProcessedHistogramData histogramData = new ProcessedHistogramData();
         histogramData.setVertexHistogram(data.getVertexTypesHistogram());
-        histogramData.setSortedFrequentEdgesHistogram(sortedFrequentEdgesHistogram);
+        histogramData.setSortedFrequentEdgesHistogram(frequentEdgesData);
         histogramData.setSortedVertexHistogram(sortedVertexHistogram);
         histogramData.setActiveAttributesSet(activeAttributesSet);
         histogramData.setVertexTypesToActiveAttributesMap(vertexTypesToActiveAttributesMap);
@@ -165,7 +196,7 @@ public class HistogramService {
      * Sets the sorted frequent edge histogram for the graph.
      * Return vertexHistogram & sortedFrequentEdgesHistogram
      */
-    public List<FrequencyStatistics> setSortedFrequentEdgeHistogram(Map<String, Integer> edgeTypesHistogram, Map<String, Integer> vertexTypesHistogram) {
+    public List<FrequencyStatistics> setSortedFrequentEdgeHistogram(Map<String, Integer> edgeTypesHistogram) {
         List<FrequencyStatistics> finalEdgesHist = edgeTypesHistogram.entrySet().stream()
                 .sorted((o1, o2) -> o2.getValue() - o1.getValue())
                 .map(entry -> new FrequencyStatistics(entry.getKey(), entry.getValue()))

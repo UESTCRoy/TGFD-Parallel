@@ -12,6 +12,6 @@ public class ProcessedHistogramData implements Serializable {
     private Map<String, Integer> vertexHistogram;
     private Set<String> activeAttributesSet;
     private Map<String, Set<String>> vertexTypesToActiveAttributesMap;
-    private List<FrequencyStatistics> sortedFrequentEdgesHistogram;
+    private List<String> sortedFrequentEdgesHistogram;
     private List<FrequencyStatistics> sortedVertexHistogram;
 }
