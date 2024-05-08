@@ -70,13 +70,13 @@ public class HistogramService {
                         .peek(attrName -> attrDistributionMap.computeIfAbsent(attrName, k -> new HashSet<>()).add(vertexType))
                         .collect(Collectors.toSet());
                 vertexTypesToAttributesMap.computeIfAbsent(vertexType, k -> new HashSet<>()).addAll(attributeNames);
-                vertexTypesToInDegreesMap.computeIfAbsent(vertexType, k -> new ArrayList<>()).add(graph.incomingEdgesOf(v).size());
+//                vertexTypesToInDegreesMap.computeIfAbsent(vertexType, k -> new ArrayList<>()).add(graph.incomingEdgesOf(v).size());
             }
         }
 
-        for (List<Integer> inDegrees : vertexTypesToInDegreesMap.values()) {
-            inDegrees.sort(Comparator.naturalOrder());
-        }
+//        for (List<Integer> inDegrees : vertexTypesToInDegreesMap.values()) {
+//            inDegrees.sort(Comparator.naturalOrder());
+//        }
 
         // Load the graph's edges
         for (RelationshipEdge edge : graph.edgeSet()) {

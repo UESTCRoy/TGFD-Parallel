@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class CoordinatorProcess {
@@ -47,17 +48,17 @@ public class CoordinatorProcess {
         initializeWorkers();
 
         // Graph Path
-        List<String> allDataPath = config.getAllDataPath();
+        String firstGraphPath = config.getFirstGraphPath();
         List<String> splitGraphPath = config.getSplitGraphPath();
         String changeFilePath = config.getChangeFilePath();
         // AWS Data Preparation
         if (dataShipperService.isAmazonMode()) {
             changeFilePath = "/home/ec2-user/changeFile";
-            dataShipperService.awsCoordinatorDataPreparation(allDataPath, splitGraphPath, changeFilePath);
+//            dataShipperService.awsCoordinatorDataPreparation(allDataPath, splitGraphPath, changeFilePath);
         }
 
         // Generate histogram and send the histogram data to all workers
-        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshots(allDataPath);
+        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshots(Stream.of(firstGraphPath).collect(Collectors.toList()));
 
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
@@ -84,7 +85,7 @@ public class CoordinatorProcess {
         Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
 
         // Define jobs and assign them to the workers
-        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(allDataPath.get(0), vertexTypes).getGraph().getGraph();
+        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(firstGraphPath, vertexTypes).getGraph().getGraph();
         logger.info("The result of optimized first snapshot graph has {} vertices and {} edges", firstGraph.vertexSet().size(), firstGraph.edgeSet().size());
         Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
 

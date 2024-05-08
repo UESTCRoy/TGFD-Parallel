@@ -33,6 +33,9 @@ public class AppConfig {
     @Value("#{'${allDataPath}'.split(',')}")
     private List<String> allDataPath;
 
+    @Value("${firstGraphPath}")
+    private String firstGraphPath;
+
     @Value("${timestamp}")
     private int timestamp;
 
