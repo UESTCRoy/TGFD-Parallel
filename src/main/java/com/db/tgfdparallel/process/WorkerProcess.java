@@ -3,7 +3,6 @@ package com.db.tgfdparallel.process;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
-import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.jgrapht.Graph;
 import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
@@ -101,10 +100,10 @@ public class WorkerProcess {
                         node -> node.getPattern().getCenterVertexType(),
                         node -> node
                 ));
-//        for (int i = 0; i < config.getTimestamp(); i++) {
-//            patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
-//                    patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
-//        }
+        for (int i = 0; i < config.getTimestamp(); i++) {
+            patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
+                    patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
+        }
 
         List<TGFD> constantTGFDs = new ArrayList<>();
         List<TGFD> generalTGFDs = new ArrayList<>();
@@ -116,10 +115,10 @@ public class WorkerProcess {
         patternTree.getTree().get(0).addAll(patternTreeNodes);
         int level = 0;
         while (level < config.getK()) {
-            List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(edgeData, patternTree, level)
-                    .stream()
-                    .filter(x -> x.getNewPattern() != null)
-                    .collect(Collectors.toList());
+            List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(edgeData, patternTree, level);
+//                    .stream()
+//                    .filter(x -> x.getNewPattern() != null)
+//                    .collect(Collectors.toList());
             if (vSpawnPatternList.isEmpty()) {
                 break;
             }
@@ -131,6 +130,7 @@ public class WorkerProcess {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
                 matchesPerTimestampsByPTN.put(newPattern, new ArrayList<>());
+                // TODO: Optimize
                 for (int timestamp = 0; timestamp < config.getTimestamp(); timestamp++) {
                     matchesPerTimestampsByPTN.get(newPattern).add(new HashSet<>());
                     entityURIsByPTN.put(newPattern, new HashMap<>());

@@ -246,7 +246,7 @@ public class PatternService {
         List<VSpawnPattern> vSpawnPatternList = new ArrayList<>();
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
-        // TODO: Set pattern Pruned?
+        // TODO: Set pattern Pruned
         for (PatternTreeNode ptn : nodes) {
             if (ptn.isPruned()) {
                 continue;
@@ -254,20 +254,10 @@ public class PatternService {
             for (String edge : edgeData) {
                 VSpawnPattern pattern = new VSpawnPattern();
 
-                String sourceVertexType = edge.split(" ")[0];
-                String targetVertexType = edge.split(" ")[2];
-                String label = edge.split(" ")[1];
-
-                // TODO: 提前过滤掉edge信息：1. sourceVertexType和targetVertexType相同；2. sourceVertexType和targetVertexType没有active attributes
-                if (sourceVertexType.equals(targetVertexType)) {
-                    logger.info("Source vertex type is equal to target vertex type. Skipping edge: " + edge);
-                    continue;
-                }
-
-//                if (!vertexTypesToActiveAttributesMap.containsKey(targetVertexType) || !vertexTypesToActiveAttributesMap.containsKey(sourceVertexType)) {
-//                    logger.info("Target and Source vertex type has no active attributes. Skipping edge: " + edge);
-//                    continue;
-//                }
+                String[] parts = edge.split(" ");
+                String sourceVertexType = parts[0];
+                String label = parts[1];
+                String targetVertexType = parts[2];
 
                 // filter out duplicate edges
                 if (checkEdgeProperties(ptn.getPattern(), label, sourceVertexType, targetVertexType)) {
@@ -280,62 +270,34 @@ public class PatternService {
                 if (sourceVertex == null && targetVertex == null) {
                     logger.info("Source and target vertices are not in the pattern. Skipping edge: " + edge);
                     continue;
+                } else if (sourceVertex != null && targetVertex != null) {
+                    logger.info("We do not support multiple edges between existing vertices. Skipping edge: " + edge);
+                    continue;
                 }
 
-                for (Vertex v : ptn.getPattern().getPattern().vertexSet()) {
-                    logger.info("Looking to add candidate edge to vertex: " + v.getTypes());
-                    if (v.isMarked()) {
-                        logger.info("Vertex is marked. Skipping edge: " + edge);
-                        continue;
-                    }
+                VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(ptn.getPattern());
+                Graph<Vertex, RelationshipEdge> graph = newPattern.getPattern();
 
-                    if (!v.getTypes().contains(sourceVertexType) && !v.getTypes().contains(targetVertexType)) {
-                        logger.info("Vertex is not source or target. Skipping edge: " + edge);
-                        v.setMarked(true);
-                        continue;
-                    }
-
-                    pattern.setOldPattern(ptn);
-                    VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(ptn.getPattern());
-                    Graph<Vertex, RelationshipEdge> graph = newPattern.getPattern();
-                    if (targetVertex == null) {
-                        targetVertex = new Vertex(targetVertexType);
-                        addVertex(newPattern, targetVertex);
-                    } else {
-                        for (Vertex vertex : newPattern.getPattern().vertexSet()) {
-                            if (vertex.getTypes().contains(targetVertexType)) {
-                                targetVertex.setMarked(true);
-                                break;
-                            }
-                        }
-                    }
-
-                    RelationshipEdge newEdge = new RelationshipEdge(label);
-
-                    if (sourceVertex == null) {
-                        sourceVertex = new Vertex(sourceVertexType);
-                        addVertex(newPattern, sourceVertex);
-                    } else {
-                        for (Vertex vertex : newPattern.getPattern().vertexSet()) {
-                            if (vertex.getTypes().contains(sourceVertexType)) {
-                                sourceVertex.setMarked(true);
-                                break;
-                            }
-                        }
-                    }
-
-                    addEdge(graph, sourceVertex, targetVertex, newEdge);
-
-                    if (isIsomorphicPattern(newPattern, vSpawnPatternList)) {
-//                        v.setMarked(true);
-                        System.out.println("Skip. Candidate pattern is an isomorph of existing pattern");
-                        continue;
-                    }
-
-                    PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes, level);
-                    pattern.setNewPattern(patternTreeNode);
-                    vSpawnPatternList.add(pattern);
+                if (sourceVertex == null) {
+                    sourceVertex = new Vertex(sourceVertexType);
+                    addVertex(newPattern, sourceVertex);
                 }
+                if (targetVertex == null) {
+                    targetVertex = new Vertex(targetVertexType);
+                    addVertex(newPattern, targetVertex);
+                }
+                RelationshipEdge newEdge = new RelationshipEdge(label);
+                addEdge(graph, sourceVertex, targetVertex, newEdge);
+
+                if (isIsomorphicPattern(newPattern, vSpawnPatternList)) {
+                    System.out.println("Skip. Candidate pattern is an isomorph of existing pattern");
+                    continue;
+                }
+
+                PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes, level);
+                pattern.setOldPattern(ptn);
+                pattern.setNewPattern(patternTreeNode);
+                vSpawnPatternList.add(pattern);
             }
         }
 
