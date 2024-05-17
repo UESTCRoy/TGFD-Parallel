@@ -11,8 +11,8 @@ public class SimpleEdge {
     private String label;
 
     public SimpleEdge(RelationshipEdge edge) {
-        this.src = edge.getSource().getUri();
-        this.dst = edge.getTarget().getUri();
+        this.src = edge.getSource().getUri() + "-" + edge.getSource().getType();
+        this.dst = edge.getTarget().getUri() + "-" + edge.getTarget().getType();
         this.label = edge.getLabel();
     }
 }

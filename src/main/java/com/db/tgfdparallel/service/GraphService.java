@@ -189,8 +189,7 @@ public class GraphService {
             vertex.setAttributes(attributes);
         } else {
             Vertex newVertex = ((TypeChange) change).getNewVertex();
-            Set<String> newType = newVertex.getTypes();
-            vertex.setTypes(newType);
+            vertex.setType(newVertex.getType());
         }
     }
 
@@ -255,11 +254,8 @@ public class GraphService {
     public Vertex getVertex(JSONObject vertexObj) {
         String uri = (String) vertexObj.get("vertexURI");
 
-        Set<String> types = new HashSet<>();
         JSONArray typesArray = vertexObj.getJSONArray("types");
-        for(int i = 0; i < typesArray.length(); i++){
-            types.add(typesArray.getString(i));
-        }
+        String type = typesArray.toString();
 
         Set<Attribute> allAttributes = new HashSet<>();
         JSONArray allAttributeLists = vertexObj.getJSONArray("allAttributesList");
@@ -270,7 +266,7 @@ public class GraphService {
             allAttributes.add(new Attribute(attrName, attrValue));
         }
 
-        return new Vertex(uri, types, allAttributes);
+        return new Vertex(uri, type, allAttributes);
     }
 
     public void addVertex(VF2DataGraph baseGraph, Vertex vertex) {
@@ -394,7 +390,7 @@ public class GraphService {
                 w = getConnectedVertex(v, edge);
                 // Check if the vertex is not visited
                 // Check if the vertex is within the diameter
-                if (distance + 1 <= diameter && isValidType(validTypes,w.getTypes()) && !visited.containsKey(w.getUri()) && graph.containsVertex(w)) {
+                if (distance + 1 <= diameter && isValidType(validTypes, w.getType()) && !visited.containsKey(w.getUri()) && graph.containsVertex(w)) {
                     // Enqueue the vertex and add it to the visited set
                     visited.put(w.getUri(), distance + 1);
                     queue.add(w);
@@ -456,13 +452,13 @@ public class GraphService {
 
     public void mergeGraphs(VF2DataGraph base, Graph<Vertex, RelationshipEdge> inputGraph) {
         inputGraph.vertexSet().forEach(inputVertex -> {
-            Vertex currentVertex = base.getNodeMap().getOrDefault(inputVertex.getUri(), null);
+            Vertex currentVertex = base.getNodeMap().getOrDefault(inputVertex.getUri() + "-" + inputVertex.getType(), null);
 
             if (currentVertex == null) {
                 base.getGraph().addVertex(inputVertex);
             } else {
                 currentVertex.setAttributes(inputVertex.getAttributes());
-                currentVertex.setTypes(inputVertex.getTypes());
+                currentVertex.setType(inputVertex.getType());
             }
         });
 
@@ -495,7 +491,7 @@ public class GraphService {
     public Vertex copyVertex(Vertex vertex) {
         Vertex newVertex = new Vertex();
         newVertex.setUri(vertex.getUri());
-        newVertex.setTypes(vertex.getTypes());
+        newVertex.setType(vertex.getType());
         newVertex.setMarked(vertex.isMarked());
 
         // Deep copy of attributes
@@ -570,9 +566,9 @@ public class GraphService {
         return baseLoader;
     }
 
-    private boolean isValidType(Set<String> validTypes, Set<String> givenTypes)
+    private boolean isValidType(Set<String> validTypes, String givenType)
     {
-        return givenTypes.stream().anyMatch(validTypes::contains);
+        return validTypes.contains(givenType);
     }
 
     public Graph<Vertex, RelationshipEdge> updateChangedGraph(Map<String, Vertex> nodeMap, Graph<Vertex, RelationshipEdge> graph) {
@@ -580,7 +576,8 @@ public class GraphService {
 
         // 使用nodeMap直接获取并添加更新后的顶点到新图
         for (Vertex vertex : graph.vertexSet()) {
-            Vertex updatedVertex = nodeMap.get(vertex.getUri());
+            String uri = vertex.getUri() + "-" + vertex.getType();
+            Vertex updatedVertex = nodeMap.get(uri);
             if (updatedVertex != null) {
                 newGraph.addVertex(updatedVertex);
             }
@@ -588,8 +585,11 @@ public class GraphService {
 
         // 使用nodeMap来获取更新后的顶点，然后添加边
         for (RelationshipEdge edge : graph.edgeSet()) {
-            Vertex sourceVertex = nodeMap.get(graph.getEdgeSource(edge).getUri());
-            Vertex targetVertex = nodeMap.get(graph.getEdgeTarget(edge).getUri());
+            Vertex edgeSource = graph.getEdgeSource(edge);
+            Vertex edgeTarget = graph.getEdgeTarget(edge);
+
+            Vertex sourceVertex = nodeMap.get(edgeSource.getUri() + "-" + edgeSource.getType());
+            Vertex targetVertex = nodeMap.get(edgeTarget.getUri() + "-" + edgeTarget.getType());
 
             if (sourceVertex != null && targetVertex != null) {
                 newGraph.addEdge(sourceVertex, targetVertex, edge);

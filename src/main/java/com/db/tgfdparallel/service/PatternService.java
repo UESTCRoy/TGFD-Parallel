@@ -82,7 +82,6 @@ public class PatternService {
         final int diameter = 0;
         AtomicInteger jobID = new AtomicInteger(0);
         Set<Job> jobsForSnapshot = new HashSet<>();
-        assignedJobsBySnapshot.put(snapshotID, jobsForSnapshot);
         Graph<Vertex, RelationshipEdge> graph = dataGraph.getGraph();
 
         for (Map.Entry<String, PatternTreeNode> entry : singlePatternTreeNodesMap.entrySet()) {
@@ -91,7 +90,7 @@ public class PatternService {
             Set<String> validTypes = Collections.singleton(ptnType);
 
             graph.vertexSet().stream()
-                    .filter(vertex -> vertex.getTypes().contains(ptnType))
+                    .filter(vertex -> vertex.getType().equals(ptnType))
                     .forEach(vertex -> {
                         Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, vertex, diameter, validTypes);
                         if (snapshotID != 0) {
@@ -110,6 +109,7 @@ public class PatternService {
                         }
                     });
         }
+        assignedJobsBySnapshot.put(snapshotID, jobsForSnapshot);
     }
 
     public int extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
@@ -160,20 +160,19 @@ public class PatternService {
         Map<String, Attribute> vertexAllAttributesMap = currentMatchedVertex.getAttributes().stream()
                 .collect(Collectors.toMap(Attribute::getAttrName, Function.identity()));
 
-        for (String matchedVertexType : currentMatchedVertex.getTypes()) {
-            for (ConstantLiteral activeAttribute : activeAttributes) {
-                if (!matchedVertexType.equals(activeAttribute.getVertexType())) continue;
-                Attribute matchedAttribute = vertexAllAttributesMap.getOrDefault(activeAttribute.getAttrName(), null);
-                if (matchedAttribute == null) continue;
+        String matchedVertexType = currentMatchedVertex.getType();
+        for (ConstantLiteral activeAttribute : activeAttributes) {
+            if (!matchedVertexType.equals(activeAttribute.getVertexType())) continue;
+            Attribute matchedAttribute = vertexAllAttributesMap.getOrDefault(activeAttribute.getAttrName(), null);
+            if (matchedAttribute == null) continue;
 
-                if (matchedVertexType.equals(centerVertexType) && matchedAttribute.getAttrName().equals("uri")) {
-                    entityURI = matchedAttribute.getAttrValue();
-                }
-
-                String matchedAttrValue = matchedAttribute.getAttrValue();
-                ConstantLiteral xLiteral = new ConstantLiteral(matchedVertexType, activeAttribute.getAttrName(), matchedAttrValue);
-                match.add(xLiteral);
+            if (matchedVertexType.equals(centerVertexType) && matchedAttribute.getAttrName().equals("uri")) {
+                entityURI = matchedAttribute.getAttrValue();
             }
+
+            String matchedAttrValue = matchedAttribute.getAttrValue();
+            ConstantLiteral xLiteral = new ConstantLiteral(matchedVertexType, activeAttribute.getAttrName(), matchedAttrValue);
+            match.add(xLiteral);
         }
 
         return entityURI;
@@ -184,10 +183,9 @@ public class PatternService {
         Map<String, Set<String>> patternVerticesAttributes = new HashMap<>();
 
         for (Vertex vertex : vertexSet) {
-            for (String vertexType : vertex.getTypes()) {
-                Set<String> attrNameSet = vertexTypesToActiveAttributesMap.getOrDefault(vertexType, new HashSet<>());
-                patternVerticesAttributes.putIfAbsent(vertexType, new HashSet<>(attrNameSet));
-            }
+            String vertexType = vertex.getType();
+            Set<String> attrNameSet = vertexTypesToActiveAttributesMap.getOrDefault(vertexType, new HashSet<>());
+            patternVerticesAttributes.putIfAbsent(vertexType, new HashSet<>(attrNameSet));
         }
 
         Set<ConstantLiteral> literals = new HashSet<>();
@@ -306,8 +304,8 @@ public class PatternService {
 
     public boolean checkEdgeProperties(VF2PatternGraph pattern, String edgeType, String sourceType, String targetType) {
         for (RelationshipEdge edge : pattern.getPattern().edgeSet()) {
-            boolean sourceMatches = edge.getSource().getTypes().contains(sourceType);
-            boolean targetMatches = edge.getTarget().getTypes().contains(targetType);
+            boolean sourceMatches = edge.getSource().getType().equals(sourceType);
+            boolean targetMatches = edge.getTarget().getType().equals(targetType);
 
             if (edge.getLabel().equalsIgnoreCase(edgeType) && sourceMatches && targetMatches) {
                 return true;
@@ -319,7 +317,7 @@ public class PatternService {
 
     private Vertex isDuplicateVertex(VF2PatternGraph newPattern, String vertexType) {
         return newPattern.getPattern().vertexSet().stream()
-                .filter(v -> v.getTypes().contains(vertexType))
+                .filter(v -> v.getType().equals(vertexType))
                 .findFirst()
                 .orElse(null);
     }
@@ -378,12 +376,12 @@ public class PatternService {
 
     public void findFirstLevelSubgraphParents(PatternTreeNode node, List<PatternTreeNode> nodes) {
         Set<String> newPatternVertices = node.getPattern().getPattern().vertexSet().stream()
-                .flatMap(vertex -> vertex.getTypes().stream())
+                .map(Vertex::getType)
                 .collect(Collectors.toSet());
 
         for (PatternTreeNode otherPatternNode : nodes) {
             Set<String> otherTypes = otherPatternNode.getPattern().getPattern().vertexSet().stream()
-                    .flatMap(vertex -> vertex.getTypes().stream())
+                    .map(Vertex::getType)
                     .collect(Collectors.toSet());
 
             if (newPatternVertices.containsAll(otherTypes)) {

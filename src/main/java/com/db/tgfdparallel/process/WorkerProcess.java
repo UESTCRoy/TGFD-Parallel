@@ -3,6 +3,7 @@ package com.db.tgfdparallel.process;
 import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
+import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.jgrapht.Graph;
 import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
@@ -78,15 +79,16 @@ public class WorkerProcess {
         // By using the change file, generate new loader for each snapshot
         GraphLoader[] loaders = new GraphLoader[config.getTimestamp()];
         loaders[0] = graphLoader;
-//        graphService.updateFirstSnapshot(graphLoader);
+        // DEBUG Comment out
+        graphService.updateFirstSnapshot(graphLoader);
 
-//        List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
-//        for (int i = 0; i < changesData.size(); i++) {
-//            // I create a deep copy of previous loader (用前一个graph，而不是第一个graph)
-//            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(loaders[i]);
-//            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), copyOfFirstLoader);
-//            loaders[i + 1] = changeLoader;
-//        }
+        List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
+        for (int i = 0; i < changesData.size(); i++) {
+            // I create a deep copy of previous loader (用前一个graph，而不是第一个graph)
+            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(loaders[i]);
+            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), copyOfFirstLoader);
+            loaders[i + 1] = changeLoader;
+        }
 
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
@@ -100,6 +102,7 @@ public class WorkerProcess {
                         node -> node.getPattern().getCenterVertexType(),
                         node -> node
                 ));
+        // TODO: 过滤掉pruned的pattern, matches少的pattern
         for (int i = 0; i < config.getTimestamp(); i++) {
             patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
                     patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
@@ -116,9 +119,6 @@ public class WorkerProcess {
         int level = 0;
         while (level < config.getK()) {
             List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(edgeData, patternTree, level);
-//                    .stream()
-//                    .filter(x -> x.getNewPattern() != null)
-//                    .collect(Collectors.toList());
             if (vSpawnPatternList.isEmpty()) {
                 break;
             }
@@ -129,12 +129,8 @@ public class WorkerProcess {
             for (VSpawnPattern vSpawnedPatterns : vSpawnPatternList) {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
-                matchesPerTimestampsByPTN.put(newPattern, new ArrayList<>());
-                // TODO: Optimize
-                for (int timestamp = 0; timestamp < config.getTimestamp(); timestamp++) {
-                    matchesPerTimestampsByPTN.get(newPattern).add(new HashSet<>());
-                    entityURIsByPTN.put(newPattern, new HashMap<>());
-                }
+                matchesPerTimestampsByPTN.put(newPattern, new ArrayList<>(Collections.nCopies(config.getTimestamp(), new HashSet<>())));
+                entityURIsByPTN.put(newPattern, new HashMap<>());
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
                 Map<Integer, Set<Job>> newJobsList = jobService.createNewJobsSet(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
@@ -251,7 +247,7 @@ public class WorkerProcess {
             }
 
             Set<String> validTypes = job.getPatternTreeNode().getPattern().getPattern().vertexSet().stream()
-                    .flatMap(v -> v.getTypes().stream())
+                    .map(Vertex::getType)
                     .collect(Collectors.toSet());
 
             level = Math.min(level, 2);
@@ -272,6 +268,7 @@ public class WorkerProcess {
 //                logger.info("Found {} matches for pattern {} in snapshot {} in {} ms", numOfMatchesInTimestamp, job.getPatternTreeNode().getPattern().getPattern(), snapshotID, endTime - startTime);
             }
         }
+        logger.info("Found {} matches in snapshot {}", numOfMatchesInTimestamp, snapshotID);
         return numOfMatchesInTimestamp;
     }
 }

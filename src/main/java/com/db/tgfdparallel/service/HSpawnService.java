@@ -148,13 +148,13 @@ public class HSpawnService {
                 .collect(Collectors.toMap(ConstantLiteral::getVertexType, Function.identity()));
 
         for (Vertex v : patternForDependency.getPattern().vertexSet()) {
-            for (String vType : v.getTypes()) {
-                ConstantLiteral constantLiteral = attributeMap.getOrDefault(vType, null);
-                if (constantLiteral != null) {
-                    Attribute attribute = new Attribute(constantLiteral.getAttrName());
-                    v.getAttributes().add(attribute);
-                }
+            String vType = v.getType();
+            ConstantLiteral constantLiteral = attributeMap.getOrDefault(vType, null);
+            if (constantLiteral != null) {
+                Attribute attribute = new Attribute(constantLiteral.getAttrName());
+                v.getAttributes().add(attribute);
             }
+
         }
     }
 

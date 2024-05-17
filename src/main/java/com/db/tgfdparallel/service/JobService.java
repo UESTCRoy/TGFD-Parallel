@@ -27,32 +27,6 @@ public class JobService {
         this.activeMQService = activeMQService;
     }
 
-    public Map<Integer, List<Job>> defineJobs(Graph<Vertex, RelationshipEdge> graph, Map<String, Integer> fragmentsForTheInitialLoad, List<PatternTreeNode> singlePatternTreeNodes) {
-        Map<Integer, List<Job>> jobsByFragmentID = new HashMap<>();
-        AtomicInteger jobID = new AtomicInteger(0);
-        int diameter = 2;
-        IntStream.rangeClosed(1, config.getWorkers().size())
-                .forEach(i -> jobsByFragmentID.put(i, new ArrayList<>()));
-
-        // TODO: The fragmentID of the job may not be useful ant all!
-        for (PatternTreeNode ptn : singlePatternTreeNodes) {
-            String centerNodeType = ptn.getPattern().getCenterVertexType();
-            graph.vertexSet().stream()
-                    .filter(v -> v.getTypes().contains(centerNodeType))
-                    .forEach(v -> {
-                        int currentJobID = jobID.incrementAndGet();
-                        List<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
-                        // TODO: 这里的字段似乎只需要edges，DataShipperService的dataToBeShippedAndSend
-                        Job job = new Job(currentJobID, diameter, v, fragmentsForTheInitialLoad.get(v.getUri()), edges, ptn);
-                        jobsByFragmentID.get(fragmentsForTheInitialLoad.get(v.getUri())).add(job);
-                        if (currentJobID % 100 == 0) {
-                            logger.info("Jobs so far: {}  **  {}", currentJobID, LocalDateTime.now());
-                        }
-                    });
-        }
-        return jobsByFragmentID;
-    }
-
     // Record which partition each vertex is assigned to, and assign edges accordingly.
     public Map<Integer, List<RelationshipEdge>> defineEdgesToBeShipped(Graph<Vertex, RelationshipEdge> graph, Map<String, Integer> fragmentsForTheInitialLoad,
                                                                        List<PatternTreeNode> singlePatternTreeNodes) {
@@ -65,7 +39,7 @@ public class JobService {
         for (PatternTreeNode ptn : singlePatternTreeNodes) {
             String centerNodeType = ptn.getPattern().getCenterVertexType();
             graph.vertexSet().stream()
-                    .filter(v -> v.getTypes().contains(centerNodeType))
+                    .filter(v -> v.getType().equals(centerNodeType))
                     .forEach(v -> {
                         List<RelationshipEdge> edges = graphService.getEdgesWithinDiameter(graph, v, diameter);
                         int fragmentID = fragmentsForTheInitialLoad.getOrDefault(v.getUri(), 0);
@@ -101,7 +75,7 @@ public class JobService {
                         .append(job.getCenterNode().getUri()).append("#")
                         .append(job.getDiameter()).append("#")
                         .append(job.getFragmentID()).append("#")
-                        .append(job.getCenterNode().getTypes())
+                        .append(job.getCenterNode().getType())
                         .append("\n");
             }
 
@@ -113,19 +87,41 @@ public class JobService {
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
     }
 
+//    public Map<Integer, Set<Job>> createNewJobsSet(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+//        Map<Integer, Set<Job>> newJobsSet = new HashMap<>();
+//        for (int index : assignedJobsBySnapshot.keySet()) {
+//            Set<Job> newJobsAtIndex = new HashSet<>();
+//            Set<Job> additionalJobs = new HashSet<>();
+//            for (Job job : assignedJobsBySnapshot.get(index)) {
+//                if (job.getPatternTreeNode().getPattern().equals(pattern)) {
+//                    Job newJob = new Job(job.getID(), job.getCenterNode(), newPattern);
+//                    newJobsAtIndex.add(newJob);
+//                    additionalJobs.add(newJob);
+//                }
+//            }
+//            assignedJobsBySnapshot.get(index).addAll(additionalJobs);
+//            newJobsSet.put(index, newJobsAtIndex);
+//        }
+//        return newJobsSet;
+//    }
+
     public Map<Integer, Set<Job>> createNewJobsSet(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
         Map<Integer, Set<Job>> newJobsSet = new HashMap<>();
         for (int index : assignedJobsBySnapshot.keySet()) {
+            Set<Job> currentJobs = assignedJobsBySnapshot.get(index);
             Set<Job> newJobsAtIndex = new HashSet<>();
-            Set<Job> additionalJobs = new HashSet<>();
-            for (Job job : assignedJobsBySnapshot.get(index)) {
+
+            Iterator<Job> iterator = currentJobs.iterator();
+            while (iterator.hasNext()) {
+                Job job = iterator.next();
                 if (job.getPatternTreeNode().getPattern().equals(pattern)) {
+                    iterator.remove();
                     Job newJob = new Job(job.getID(), job.getCenterNode(), newPattern);
                     newJobsAtIndex.add(newJob);
-                    additionalJobs.add(newJob);
                 }
             }
-            assignedJobsBySnapshot.get(index).addAll(additionalJobs);
+
+            currentJobs.addAll(newJobsAtIndex);
             newJobsSet.put(index, newJobsAtIndex);
         }
         return newJobsSet;

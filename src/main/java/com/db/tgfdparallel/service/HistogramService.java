@@ -57,40 +57,33 @@ public class HistogramService {
         Map<String, Integer> vertexTypesHistogram = new HashMap<>();
         Map<String, Set<String>> vertexTypesToAttributesMap = new HashMap<>();
         Map<String, Set<String>> attrDistributionMap = new HashMap<>();
-        Map<String, List<Integer>> vertexTypesToInDegreesMap = new HashMap<>();
         Map<String, Integer> edgeTypesHistogram = new HashMap<>();
 
         // Load the graph's vertices and attributes
         for (Vertex v : graph.vertexSet()) {
-            for (String vertexType : v.getTypes()) {
-                vertexTypesHistogram.merge(vertexType, 1, Integer::sum);
-                Set<String> attributeNames = v.getAttributes().stream()
-                        .map(Attribute::getAttrName)
-                        .filter(name -> !name.equals("uri"))
-                        .peek(attrName -> attrDistributionMap.computeIfAbsent(attrName, k -> new HashSet<>()).add(vertexType))
-                        .collect(Collectors.toSet());
-                vertexTypesToAttributesMap.computeIfAbsent(vertexType, k -> new HashSet<>()).addAll(attributeNames);
-            }
+            String vertexType = v.getType();
+            vertexTypesHistogram.merge(vertexType, 1, Integer::sum);
+            Set<String> attributeNames = v.getAttributes().stream()
+                    .map(Attribute::getAttrName)
+                    .filter(name -> !name.equals("uri"))
+                    .peek(attrName -> attrDistributionMap.computeIfAbsent(attrName, k -> new HashSet<>()).add(vertexType))
+                    .collect(Collectors.toSet());
+            vertexTypesToAttributesMap.computeIfAbsent(vertexType, k -> new HashSet<>()).addAll(attributeNames);
         }
 
         // Load the graph's edges
         for (RelationshipEdge edge : graph.edgeSet()) {
-            Vertex sourceVertex = edge.getSource();
             String predicateName = edge.getLabel();
-            Vertex objectVertex = edge.getTarget();
+            String sourceVertexType = edge.getSource().getType();
+            String objectVertexType = edge.getTarget().getType();
 
-            for (String sourceVertexType : sourceVertex.getTypes()) {
-                for (String objectVertexType : objectVertex.getTypes()) {
-                    String uniqueEdge = sourceVertexType + " " + predicateName + " " + objectVertexType;
-                    edgeTypesHistogram.merge(uniqueEdge, 1, Integer::sum);
-                }
-            }
+            String uniqueEdge = sourceVertexType + " " + predicateName + " " + objectVertexType;
+            edgeTypesHistogram.merge(uniqueEdge, 1, Integer::sum);
         }
 
         data.setVertexTypesHistogram(vertexTypesHistogram);
         data.setVertexTypesToAttributesMap(vertexTypesToAttributesMap);
         data.setAttrDistributionMap(attrDistributionMap);
-        data.setVertexTypesToInDegreesMap(vertexTypesToInDegreesMap);
         data.setEdgeTypesHistogram(edgeTypesHistogram);
     }
 
@@ -133,12 +126,9 @@ public class HistogramService {
                 .collect(Collectors.toList());
 
         ProcessedHistogramData histogramData = new ProcessedHistogramData();
-        histogramData.setVertexHistogram(data.getVertexTypesHistogram());
         histogramData.setSortedFrequentEdgesHistogram(frequentEdgesData);
         histogramData.setSortedVertexHistogram(sortedVertexHistogram);
-        histogramData.setActiveAttributesSet(activeAttributesSet);
         histogramData.setVertexTypesToActiveAttributesMap(vertexTypesToActiveAttributesMap);
-
         return histogramData;
     }
 
@@ -223,7 +213,6 @@ public class HistogramService {
 
         return sortedVertexTypesHistogram;
     }
-
 
 
 }

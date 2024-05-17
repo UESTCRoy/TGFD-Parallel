@@ -1,11 +1,11 @@
 1. 300k_IMDB
 Coordinator:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=3 --firstGraphPath=/home/wang851/data/imdb/completeGraph/300k_imdb/imdb-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=16 --firstGraphPath=/home/wang851/data/imdb/completeGraph/300k_imdb/imdb-170909.nt
 Zurich:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_1/imdb0-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_1/imdb0-170909.nt
 Geneva:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_2/imdb1-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_2/imdb1-170909.nt
 Tokyo:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_3/imdb2-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_3/imdb2-170909.nt
 Salzburg:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_4/imdb3-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_4/imdb3-170909.nt

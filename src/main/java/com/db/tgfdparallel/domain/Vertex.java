@@ -17,28 +17,26 @@ public class Vertex implements Serializable {
     @EqualsAndHashCode.Include
     private String uri;
     //    @EqualsAndHashCode.Include
-    private Set<String> types;
+    private String type;
     private Set<Attribute> attributes;
     private boolean isMarked;
 //    private Set<Integer> jobletID;
 
     public Vertex(String uri, String type) {
         this.uri = uri;
-        this.types = new HashSet<>();
-        this.types.add(type);
+        this.type = type;
         this.attributes = new HashSet<>();
     }
 
-    public Vertex(String uri, Set<String> types, Set<Attribute> attributes) {
+    public Vertex(String uri, String type, Set<Attribute> attributes) {
         this.uri = uri;
-        this.types = types;
+        this.type = type;
         this.attributes = attributes;
     }
 
     public Vertex(String type) {
         this.uri = type;
-        this.types = new HashSet<>();
-        this.types.add(type);
+        this.type = type;
         this.attributes = new HashSet<>();
     }
 
@@ -47,7 +45,7 @@ public class Vertex implements Serializable {
             return false;
         }
 
-        if (!this.getTypes().containsAll(other.getTypes()) && !other.getTypes().iterator().next().equals("_")) {
+        if (!this.getType().equals(other.getType())) {
             return false;
         }
 
