@@ -80,7 +80,6 @@ public class PatternService {
                                                 List<List<Job>> levelZeroJobs) {
         // We start from the singleNodeVertex, so the initial diameter is set to 0.
         final int diameter = 0;
-        AtomicInteger jobID = new AtomicInteger(0);
         Graph<Vertex, RelationshipEdge> graph = dataGraph.getGraph();
         List<Job> jobsForThisSnapshot = levelZeroJobs.get(snapshotID);
 
@@ -103,7 +102,7 @@ public class PatternService {
                             int numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
 
                             if (!matches.isEmpty()) {
-                                Job newJob = new Job(jobID.incrementAndGet(), vertex, ptn);
+                                Job newJob = new Job(vertex, ptn);
                                 matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
                                 jobsForThisSnapshot.add(newJob);
                             }

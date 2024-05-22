@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -59,42 +58,13 @@ public class JobService {
         return edgesInfo;
     }
 
-    // TODO: we might not need this function, because worker doesn't need jobs, it could only based on singleNodePattern
-    public void jobAssigner(Map<Integer, List<Job>> jobsByFragmentID) {
-        logger.info("*JOB ASSIGNER*: Jobs are received to be assigned to the workers");
-
-        StringBuilder message;
-        activeMQService.connectProducer();
-
-        for (int workerID : jobsByFragmentID.keySet()) {
-            message = new StringBuilder();
-            message.append("#jobs").append("\n");
-            for (Job job : jobsByFragmentID.get(workerID)) {
-                // A job is in the form of the following
-                // id # CenterNodeVertexID # diameter # FragmentID # Type
-                message.append(job.getID()).append("#")
-                        .append(job.getCenterNode().getUri()).append("#")
-                        .append(job.getDiameter()).append("#")
-                        .append(job.getFragmentID()).append("#")
-                        .append(job.getCenterNode().getType())
-                        .append("\n");
-            }
-
-            activeMQService.send(config.getWorkers().get(workerID - 1), message.toString());
-            logger.info("*JOB ASSIGNER*: jobs assigned to '{}' successfully", config.getWorkers().get(workerID - 1));
-        }
-
-        activeMQService.closeProducer();
-        logger.info("*JOB ASSIGNER*: All jobs are assigned.");
-    }
-
     public List<List<Job>> createNewJobsSet(List<List<Job>> previousLevelJobList, VF2PatternGraph pattern, PatternTreeNode newPattern) {
         List<List<Job>> currentLevelJobList = new ArrayList<>(config.getTimestamp());
 
         for (List<Job> previousJobs : previousLevelJobList) {
             List<Job> filteredJobs = previousJobs.stream()
                     .filter(job -> job.getPatternTreeNode().getPattern().equals(pattern))
-                    .map(job -> new Job(job.getID(), job.getCenterNode(), newPattern))
+                    .map(job -> new Job(job.getCenterNode(), newPattern))
                     .collect(Collectors.toList());
 
             currentLevelJobList.add(filteredJobs);
