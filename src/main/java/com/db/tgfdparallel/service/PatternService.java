@@ -77,12 +77,12 @@ public class PatternService {
                                                 Map<String, PatternTreeNode> singlePatternTreeNodesMap,
                                                 Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                 Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
-                                                Map<Integer, Set<Job>> assignedJobsBySnapshot) {
+                                                List<List<Job>> levelZeroJobs) {
         // We start from the singleNodeVertex, so the initial diameter is set to 0.
         final int diameter = 0;
         AtomicInteger jobID = new AtomicInteger(0);
-        Set<Job> jobsForSnapshot = new HashSet<>();
         Graph<Vertex, RelationshipEdge> graph = dataGraph.getGraph();
+        List<Job> jobsForThisSnapshot = levelZeroJobs.get(snapshotID);
 
         for (Map.Entry<String, PatternTreeNode> entry : singlePatternTreeNodesMap.entrySet()) {
             String ptnType = entry.getKey();
@@ -103,13 +103,13 @@ public class PatternService {
                             int numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
 
                             if (!matches.isEmpty()) {
-                                jobsForSnapshot.add(new Job(jobID.incrementAndGet(), vertex, ptn));
+                                Job newJob = new Job(jobID.incrementAndGet(), vertex, ptn);
                                 matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
+                                jobsForThisSnapshot.add(newJob);
                             }
                         }
                     });
         }
-        assignedJobsBySnapshot.put(snapshotID, jobsForSnapshot);
     }
 
     public int extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
@@ -292,6 +292,7 @@ public class PatternService {
                     continue;
                 }
 
+                // TODO: What this method does?
                 PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes, level);
                 pattern.setOldPattern(ptn);
                 pattern.setNewPattern(patternTreeNode);

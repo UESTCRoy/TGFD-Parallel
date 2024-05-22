@@ -93,7 +93,9 @@ public class WorkerProcess {
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
         Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN = new HashMap<>();
-        Map<Integer, Set<Job>> assignedJobsBySnapshot = new HashMap<>();
+        List<List<List<Job>>> assignedJobsByLevel = new ArrayList<>();
+        assignedJobsByLevel.add(new ArrayList<>());
+        List<List<Job>> levelZeroJobs = assignedJobsByLevel.get(0);
         init(patternTreeNodes, matchesPerTimestampsByPTN, entityURIsByPTN);
 
         // run first level matches
@@ -104,8 +106,9 @@ public class WorkerProcess {
                 ));
         // TODO: 过滤掉pruned的pattern, matches少的pattern
         for (int i = 0; i < config.getTimestamp(); i++) {
+            levelZeroJobs.add(new ArrayList<>());
             patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
-                    patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, assignedJobsBySnapshot);
+                    patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, levelZeroJobs);
         }
 
         List<TGFD> constantTGFDs = new ArrayList<>();
@@ -124,6 +127,8 @@ public class WorkerProcess {
             }
             List<PatternTreeNode> newPatternList = vSpawnPatternList.stream().map(VSpawnPattern::getNewPattern).collect(Collectors.toList());
             patternTree.getTree().add(newPatternList);
+            List<List<Job>> previousLevelJobList = assignedJobsByLevel.get(level);
+            assignedJobsByLevel.add(new ArrayList<>());
             level++;
 
             for (VSpawnPattern vSpawnedPatterns : vSpawnPatternList) {
@@ -133,9 +138,10 @@ public class WorkerProcess {
                 entityURIsByPTN.put(newPattern, new HashMap<>());
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
-                Map<Integer, Set<Job>> newJobsList = jobService.createNewJobsSet(assignedJobsBySnapshot, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
-                int numOfNewJobs = newJobsList.values().stream()
-                        .mapToInt(Set::size)
+                List<List<Job>> newJobsList = jobService.createNewJobsSet(previousLevelJobList, vSpawnedPatterns.getOldPattern().getPattern(), newPattern);
+                assignedJobsByLevel.get(level).addAll(newJobsList);
+                int numOfNewJobs = newJobsList.stream()
+                        .mapToInt(List::size)
                         .sum();
                 logger.info("We got {} new jobs to find new pattern's matches", numOfNewJobs);
                 if (level == 1 && numOfNewJobs < 100 * config.getTimestamp()) {
@@ -151,19 +157,6 @@ public class WorkerProcess {
                     futures.add(future);
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-
-                List<Set<Set<ConstantLiteral>>> matchesSet = matchesPerTimestampsByPTN.get(newPattern);
-                if (matchesSet != null && !matchesSet.isEmpty()) {
-                    int timestampCount = config.getTimestamp();
-                    for (int i = 0; i < timestampCount; i++) {
-                        Set<Set<ConstantLiteral>> sets = matchesSet.get(i);
-                        if (sets != null) {
-                            logger.info("The number of matches for pattern {} in timestamp {} is {}", pattern, i, sets.size());
-                        } else {
-                            logger.info("No matches found for pattern {} in timestamp {}", pattern, i);
-                        }
-                    }
-                }
 
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(entityURIsByPTN.get(newPattern),
@@ -224,7 +217,7 @@ public class WorkerProcess {
     }
 
     @Async
-    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, GraphLoader loader, Map<Integer, Set<Job>> newJobsList,
+    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, GraphLoader loader, List<List<Job>> newJobsList,
                                                        Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                                                        Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
                                                        Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
@@ -233,7 +226,7 @@ public class WorkerProcess {
         );
     }
 
-    public int runSnapshot(int snapshotID, GraphLoader loader, Map<Integer, Set<Job>> newJobsList,
+    public int runSnapshot(int snapshotID, GraphLoader loader, List<List<Job>> newJobsList,
                            Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN, int level,
                            Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();

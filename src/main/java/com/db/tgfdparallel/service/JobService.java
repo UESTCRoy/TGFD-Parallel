@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @Service
@@ -87,44 +88,19 @@ public class JobService {
         logger.info("*JOB ASSIGNER*: All jobs are assigned.");
     }
 
-//    public Map<Integer, Set<Job>> createNewJobsSet(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
-//        Map<Integer, Set<Job>> newJobsSet = new HashMap<>();
-//        for (int index : assignedJobsBySnapshot.keySet()) {
-//            Set<Job> newJobsAtIndex = new HashSet<>();
-//            Set<Job> additionalJobs = new HashSet<>();
-//            for (Job job : assignedJobsBySnapshot.get(index)) {
-//                if (job.getPatternTreeNode().getPattern().equals(pattern)) {
-//                    Job newJob = new Job(job.getID(), job.getCenterNode(), newPattern);
-//                    newJobsAtIndex.add(newJob);
-//                    additionalJobs.add(newJob);
-//                }
-//            }
-//            assignedJobsBySnapshot.get(index).addAll(additionalJobs);
-//            newJobsSet.put(index, newJobsAtIndex);
-//        }
-//        return newJobsSet;
-//    }
+    public List<List<Job>> createNewJobsSet(List<List<Job>> previousLevelJobList, VF2PatternGraph pattern, PatternTreeNode newPattern) {
+        List<List<Job>> currentLevelJobList = new ArrayList<>(config.getTimestamp());
 
-    public Map<Integer, Set<Job>> createNewJobsSet(Map<Integer, Set<Job>> assignedJobsBySnapshot, VF2PatternGraph pattern, PatternTreeNode newPattern) {
-        Map<Integer, Set<Job>> newJobsSet = new HashMap<>();
-        for (int index : assignedJobsBySnapshot.keySet()) {
-            Set<Job> currentJobs = assignedJobsBySnapshot.get(index);
-            Set<Job> newJobsAtIndex = new HashSet<>();
+        for (List<Job> previousJobs : previousLevelJobList) {
+            List<Job> filteredJobs = previousJobs.stream()
+                    .filter(job -> job.getPatternTreeNode().getPattern().equals(pattern))
+                    .map(job -> new Job(job.getID(), job.getCenterNode(), newPattern))
+                    .collect(Collectors.toList());
 
-            Iterator<Job> iterator = currentJobs.iterator();
-            while (iterator.hasNext()) {
-                Job job = iterator.next();
-                if (job.getPatternTreeNode().getPattern().equals(pattern)) {
-                    iterator.remove();
-                    Job newJob = new Job(job.getID(), job.getCenterNode(), newPattern);
-                    newJobsAtIndex.add(newJob);
-                }
-            }
-
-            currentJobs.addAll(newJobsAtIndex);
-            newJobsSet.put(index, newJobsAtIndex);
+            currentLevelJobList.add(filteredJobs);
         }
-        return newJobsSet;
+
+        return currentLevelJobList;
     }
 
 }
