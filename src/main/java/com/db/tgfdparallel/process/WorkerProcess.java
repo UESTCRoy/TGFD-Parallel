@@ -45,16 +45,17 @@ public class WorkerProcess {
         this.s3Service = s3Service;
     }
 
+    private Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN;
+    private Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN;
+    private List<List<List<Job>>> assignedJobsByLevel;
+
     public void start() {
         // Send the status to the coordinator
         logger.info("{} send the status to Coordinator at {}", config.getNodeName(), LocalDateTime.now());
         activeMQService.sendStatus();
 
         // Receive the histogram data from the coordinator
-        long histogramStartTime = System.currentTimeMillis();
-        ProcessedHistogramData histogramData = dataShipperService.receiveHistogramData();
-        long histogramEndTime = System.currentTimeMillis();
-        logger.info("Received Histogram From Coordinator, {} ms", histogramEndTime - histogramStartTime);
+        ProcessedHistogramData histogramData = receiveAndProcessHistogramData();
         Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
         List<String> edgeData = histogramData.getSortedFrequentEdgesHistogram();
 
@@ -64,39 +65,19 @@ public class WorkerProcess {
                 .map(FrequencyStatistics::getType).collect(Collectors.toSet());
 
         // Receive the pattern tree from the coordinator
-        long singlePatternStartTime = System.currentTimeMillis();
-        List<PatternTreeNode> patternTreeNodes = dataShipperService.receiveSinglePatternNode();
-        long singlePatternEndTime = System.currentTimeMillis();
-        logger.info("Received singlePatternTreeNodes From Coordinator, {} ms", singlePatternEndTime - singlePatternStartTime);
+        List<PatternTreeNode> patternTreeNodes = receivePatternTreeNodes();
 
         // Load the first snapshot
         String dataPath = dataShipperService.workerDataPreparation();
-        GraphLoader graphLoader = graphService.loadFirstSnapshot(dataPath, vertexTypes);
+        GraphLoader initialLoader = graphService.loadFirstSnapshot(dataPath, vertexTypes);
         logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
-                graphLoader.getGraph().getGraph().edgeSet().size(),
-                graphLoader.getGraph().getGraph().vertexSet().size());
+                initialLoader.getGraph().getGraph().edgeSet().size(), initialLoader.getGraph().getGraph().vertexSet().size());
 
         // By using the change file, generate new loader for each snapshot
-        GraphLoader[] loaders = new GraphLoader[config.getTimestamp()];
-        loaders[0] = graphLoader;
-        // DEBUG Comment out
-        graphService.updateFirstSnapshot(graphLoader);
-
-        List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
-        for (int i = 0; i < changesData.size(); i++) {
-            // I create a deep copy of previous loader (用前一个graph，而不是第一个graph)
-            GraphLoader copyOfFirstLoader = DeepCopyUtil.deepCopy(loaders[i]);
-            GraphLoader changeLoader = graphService.updateNextSnapshot(changesData.get(i), copyOfFirstLoader);
-            loaders[i + 1] = changeLoader;
-        }
+        GraphLoader[] loaders = processChangesAndLoadSubsequentSnapshots(initialLoader);
 
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
-        Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN = new HashMap<>();
-        Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN = new HashMap<>();
-        List<List<List<Job>>> assignedJobsByLevel = new ArrayList<>();
-        assignedJobsByLevel.add(new ArrayList<>());
-        List<List<Job>> levelZeroJobs = assignedJobsByLevel.get(0);
-        init(patternTreeNodes, matchesPerTimestampsByPTN, entityURIsByPTN);
+        initializePatternDataStructures(patternTreeNodes);
 
         // run first level matches
         Map<String, PatternTreeNode> patternTreeNodeMap = patternTreeNodes.stream()
@@ -104,12 +85,14 @@ public class WorkerProcess {
                         node -> node.getPattern().getCenterVertexType(),
                         node -> node
                 ));
-        // TODO: 过滤掉pruned的pattern, matches少的pattern
+
+        List<List<Job>> levelZeroJobs = assignedJobsByLevel.get(0);
         for (int i = 0; i < config.getTimestamp(); i++) {
             levelZeroJobs.add(new ArrayList<>());
             patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, vertexTypesToActiveAttributesMap,
                     patternTreeNodeMap, entityURIsByPTN, matchesPerTimestampsByPTN, levelZeroJobs);
         }
+        evaluatePatternSupport(patternTreeNodes, vertexHistogram);
 
         List<TGFD> constantTGFDs = new ArrayList<>();
         List<TGFD> generalTGFDs = new ArrayList<>();
@@ -204,16 +187,61 @@ public class WorkerProcess {
         }
     }
 
-    public void init(List<PatternTreeNode> patternTreeNodes,
-                     Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
-                     Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN) {
+    private ProcessedHistogramData receiveAndProcessHistogramData() {
+        long startTime = System.currentTimeMillis();
+        ProcessedHistogramData histogramData = dataShipperService.receiveHistogramData();
+        long endTime = System.currentTimeMillis();
+        logger.info("Received Histogram From Coordinator, {} ms", endTime - startTime);
+        return histogramData;
+    }
+
+    private List<PatternTreeNode> receivePatternTreeNodes() {
+        long startTime = System.currentTimeMillis();
+        List<PatternTreeNode> patternTreeNodes = dataShipperService.receiveSinglePatternNode();
+        long endTime = System.currentTimeMillis();
+        logger.info("Received singlePatternTreeNodes From Coordinator, {} ms", endTime - startTime);
+        return patternTreeNodes;
+    }
+
+    private GraphLoader[] processChangesAndLoadSubsequentSnapshots(GraphLoader initialLoader) {
+        GraphLoader[] loaders = new GraphLoader[config.getTimestamp()];
+        loaders[0] = initialLoader;
+        // DEBUG Comment out
+        graphService.updateFirstSnapshot(initialLoader);
+        List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
+        for (int i = 0; i < changesData.size(); i++) {
+            GraphLoader copyOfLoader = DeepCopyUtil.deepCopy(loaders[i]);
+            loaders[i + 1] = graphService.updateNextSnapshot(changesData.get(i), copyOfLoader);
+        }
+        return loaders;
+    }
+
+    private void initializePatternDataStructures(List<PatternTreeNode> patternTreeNodes) {
+        matchesPerTimestampsByPTN = new HashMap<>();
+        entityURIsByPTN = new HashMap<>();
+        assignedJobsByLevel = new ArrayList<>();
+        assignedJobsByLevel.add(new ArrayList<>());
+
         for (PatternTreeNode ptn : patternTreeNodes) {
             matchesPerTimestampsByPTN.computeIfAbsent(ptn, k -> IntStream.range(0, config.getTimestamp())
                     .mapToObj(timestamp -> new HashSet<Set<ConstantLiteral>>())
                     .collect(Collectors.toList()));
-
             entityURIsByPTN.put(ptn, new HashMap<>());
         }
+    }
+
+    private void evaluatePatternSupport(List<PatternTreeNode> patternTreeNodes, Map<String, Integer> vertexHistogram) {
+        patternTreeNodes.forEach(ptn -> {
+            double patternSupport = patternService.calculatePatternSupport(
+                    entityURIsByPTN.get(ptn),
+                    vertexHistogram.get(ptn.getPattern().getCenterVertexType()),
+                    config.getTimestamp()
+            );
+            if (patternSupport < config.getPatternTheta()) {
+                ptn.setPruned(true);
+                logger.info("Pruned pattern {} due to insufficient support.", ptn.getPattern().getPattern());
+            }
+        });
     }
 
     @Async
