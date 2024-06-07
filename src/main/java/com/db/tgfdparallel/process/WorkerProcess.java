@@ -207,11 +207,15 @@ public class WorkerProcess {
         GraphLoader[] loaders = new GraphLoader[config.getTimestamp()];
         loaders[0] = initialLoader;
         // DEBUG Comment out
-        graphService.updateFirstSnapshot(initialLoader);
+//        graphService.updateFirstSnapshot(initialLoader);
+        logger.info("Load the updated first snapshot, graph edge size: {}, graph vertex size: {}",
+                initialLoader.getGraph().getGraph().edgeSet().size(), initialLoader.getGraph().getGraph().vertexSet().size());
         List<List<Change>> changesData = dataShipperService.receiveChangesFromCoordinator();
         for (int i = 0; i < changesData.size(); i++) {
             GraphLoader copyOfLoader = DeepCopyUtil.deepCopy(loaders[i]);
             loaders[i + 1] = graphService.updateNextSnapshot(changesData.get(i), copyOfLoader);
+            logger.info("Load the {} snapshot, graph edge size: {}, graph vertex size: {}",
+                    i + 1, loaders[i + 1].getGraph().getGraph().edgeSet().size(), loaders[i + 1].getGraph().getGraph().vertexSet().size());
         }
         return loaders;
     }

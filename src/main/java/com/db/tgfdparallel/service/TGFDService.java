@@ -19,24 +19,35 @@ import java.util.stream.Collectors;
 public class TGFDService {
     private static final Logger logger = LoggerFactory.getLogger(TGFDService.class);
     private final AppConfig config;
+    private final PatternService patternService;
+    private final DependencyService dependencyService;
 
     @Autowired
-    public TGFDService(AppConfig config) {
+    public TGFDService(AppConfig config, PatternService patternService, DependencyService dependencyService) {
         this.config = config;
+        this.patternService = patternService;
+        this.dependencyService = dependencyService;
     }
 
     public List<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
                                            Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs) {
+        long startTime = System.currentTimeMillis();
+
         List<TGFD> result = new ArrayList<>();
         int level = patternNode.getPattern().getPattern().vertexSet().size();
+        VF2PatternGraph pattern = patternNode.getPattern();
+        List<AttributeDependency> allMinimalConstantDependenciesOnThisPath = patternService.getAllMinimalConstantDependenciesOnThisPath(patternNode);
+        double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
 
         for (Map.Entry<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
             Set<ConstantLiteral> xLiterals = entityEntry.getKey();
             List<Map.Entry<ConstantLiteral, List<Integer>>> rhsAttrValuesTimestampsSortedByFreq = entityEntry.getValue();
 
+            long rhsDiscoveryStartTime = System.currentTimeMillis();
             // 不管rhsAttrValuesTimestampsSortedByFreq的size，也计算Delta，对每个都转成TGFD，然后support返回给Coordinator处理
+            // TODO: Deal with multiple rhs
             for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
-                VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(patternNode.getPattern());
+                VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(pattern);
                 DataDependency newDependency = new DataDependency();
                 AttributeDependency constantPath = new AttributeDependency();
 
@@ -53,7 +64,6 @@ public class TGFDService {
                 int minDistance = minMaxPair.getMin();
                 int maxDistance = minMaxPair.getMax();
 
-                double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
                 long numberOfPairs = MathUtil.countPairs(values);
                 // TODO: 这里并不是用numberOfDeltas, 而是matches的pair数量
                 double tgfdSupport = calculateTGFDSupport(numberOfPairs, entities.size(), config.getTimestamp());
@@ -67,15 +77,28 @@ public class TGFDService {
                     candidatePairs.add(minMaxPair);
                 }
 
-                Delta candidateTGFDdelta = new Delta(Period.ofYears(minDistance), Period.ofYears(maxDistance), Duration.ofDays(365));
+                Delta candidateTGFDdelta = new Delta(Period.ofYears(minDistance), Period.ofYears(maxDistance));
                 constantPath.setDelta(candidateTGFDdelta);
 
+//                long constantTGFDKeyStartTime = System.currentTimeMillis();
+//                if (dependencyService.isSuperSetOfPathAndSubsetOfDelta(constantPath, allMinimalConstantDependenciesOnThisPath)) {
+//                    logger.info("WE CANNOT SKIP THIS STEP!!");
+//                    continue;
+//                }
+//                long constantTGFDKeyEndTime = System.currentTimeMillis();
+//                logger.info("Time taken to check super set of path and subset of delta: {} ms", (constantTGFDKeyEndTime - constantTGFDKeyStartTime));
+
+                patternService.addMinimalConstantDependency(patternNode, constantPath);
+
                 // Coordinator处，delta, support 需要重新计算
-                TGFD candidateConstantTGFD = new TGFD(patternNode.getPattern(), minMaxPair, newDependency, 0.0,
+                TGFD candidateConstantTGFD = new TGFD(newPattern, minMaxPair, newDependency, 0.0,
                         patternNode.getPatternSupport(), level, entities.size());
                 result.add(candidateConstantTGFD);
             }
+            long rhsDiscoveryEndTime = System.currentTimeMillis();
         }
+        long endTime = System.currentTimeMillis();
+        logger.info("Time taken to discover constant TGFDs: {} ms, there are {} entities", (endTime - startTime), entities.size());
 
         return result;
     }
@@ -112,9 +135,9 @@ public class TGFDService {
 
     public List<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, double patternSupport, AttributeDependency literalPath,
                                           List<Pair> deltas, int entitySize) {
+        long startTime = System.currentTimeMillis();
         List<TGFD> tgfds = new ArrayList<>();
         List<Pair> candidateDeltas = mergeOverlappingPairs(deltas);
-
         /*
             咱就不在worker计算support了，把相同Literal Path获得的General TGFD的Delta合并
             然后返回给Coordinator进行下一步合并Delta，在进行support的计算
@@ -135,6 +158,11 @@ public class TGFDService {
             tgfds.add(tgfd);
         }
 
+        if (!tgfds.isEmpty()) {
+            patternService.addMinimalDependency(patternTreeNode, literalPath);
+        }
+        long endTime = System.currentTimeMillis();
+        logger.info("Time taken to discover general TGFDs: {} ms on {}, and there are {} general TGFD", (endTime - startTime), literalPath, tgfds.size());
         return tgfds;
     }
 

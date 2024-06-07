@@ -287,7 +287,12 @@ public class PatternService {
                 addEdge(graph, sourceVertex, targetVertex, newEdge);
 
                 if (isIsomorphicPattern(newPattern, vSpawnPatternList)) {
-                    System.out.println("Skip. Candidate pattern is an isomorph of existing pattern");
+                    logger.info("Skip. Candidate pattern is an isomorph of existing pattern");
+                    continue;
+                }
+
+                if (isSuperGraphOfPrunedPattern(newPattern, patternTree)) {
+                    logger.info("Skip. Candidate pattern is a supergraph of pruned pattern");
                     continue;
                 }
 
@@ -427,6 +432,84 @@ public class PatternService {
                     printParent(node, parent);
                     node.setCenterVertexParent(parent);
                 });
+    }
+
+    public void addMinimalDependency(PatternTreeNode node, AttributeDependency dependency) {
+        if (node.getMinimalDependencies() == null) {
+            node.setMinimalDependencies(new ArrayList<>());
+        }
+        node.getMinimalDependencies().add(dependency);
+    }
+
+    public void addMinimalConstantDependency(PatternTreeNode node, AttributeDependency dependency) {
+        if (node.getMinimalConstantDependencies() == null) {
+            node.setMinimalConstantDependencies(new ArrayList<>());
+        }
+        node.getMinimalConstantDependencies().add(dependency);
+    }
+
+
+    public List<AttributeDependency> getAllMinimalConstantDependenciesOnThisPath(PatternTreeNode currPatternTreeNode) {
+        return getAllDependenciesOnThisPath(currPatternTreeNode, true);
+    }
+
+    public List<AttributeDependency> getAllMinimalDependenciesOnThisPath(PatternTreeNode currPatternTreeNode) {
+        return getAllDependenciesOnThisPath(currPatternTreeNode, false);
+    }
+
+    private List<AttributeDependency> getAllDependenciesOnThisPath(PatternTreeNode currPatternTreeNode, boolean constant) {
+        Set<AttributeDependency> dependencies = new HashSet<>();
+        collectDependencies(currPatternTreeNode, dependencies, constant);
+        return new ArrayList<>(dependencies);
+    }
+
+    private void collectDependencies(PatternTreeNode node, Set<AttributeDependency> dependencies, boolean constant) {
+        if (constant) {
+            dependencies.addAll(node.getMinimalConstantDependencies());
+        } else {
+            dependencies.addAll(node.getMinimalDependencies());
+        }
+
+        for (PatternTreeNode parent : node.getSubgraphParents()) {
+            collectDependencies(parent, dependencies, constant);
+        }
+    }
+
+    public boolean literalPathIsMissingTypesInPattern(List<ConstantLiteral> parentsPathToRoot, Set<Vertex> patternVertexSet) {
+        Set<String> literalTypes = new HashSet<>();
+        for (ConstantLiteral literal : parentsPathToRoot) {
+            literalTypes.add(literal.getVertexType());
+        }
+
+        for (Vertex vertex : patternVertexSet) {
+            if (!literalTypes.contains(vertex.getType())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isSuperGraphOfPrunedPattern(VF2PatternGraph newPattern, PatternTree patternTree) {
+        Set<String> newPatternEdges = newPattern.getPattern().edgeSet().stream()
+                .map(Object::toString)
+                .collect(Collectors.toSet());
+
+        for (int i = patternTree.getTree().size() - 1; i >= 0; i--) {
+            for (PatternTreeNode treeNode : patternTree.getTree().get(i)) {
+                if (treeNode.isPruned() && treeNode.getPattern().getCenterVertexType().equals(newPattern.getCenterVertexType())) {
+                    Set<String> otherPatternEdges = treeNode.getPattern().getPattern().edgeSet().stream()
+                            .map(Object::toString)
+                            .collect(Collectors.toSet());
+
+                    if (newPatternEdges.containsAll(otherPatternEdges)) {
+                        System.out.println("Candidate pattern: " + newPattern + " is a supergraph of pruned subgraph pattern: " + treeNode.getPattern());
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private void printParent(PatternTreeNode node, PatternTreeNode otherPatternNode) {
