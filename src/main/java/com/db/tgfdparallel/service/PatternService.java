@@ -73,47 +73,26 @@ public class PatternService {
     }
 
     public void singleNodePatternInitialization(VF2DataGraph dataGraph, int snapshotID,
-                                                Map<String, Set<String>> vertexTypesToActiveAttributesMap,
                                                 Map<String, PatternTreeNode> singlePatternTreeNodesMap,
-                                                Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
-                                                Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
-                                                List<List<Job>> levelZeroJobs) {
+                                                Map<String, Map<String, List<Integer>>> entityURIsByPTN) {
         // We start from the singleNodeVertex, so the initial diameter is set to 0.
-        final int diameter = 0;
         Graph<Vertex, RelationshipEdge> graph = dataGraph.getGraph();
-        List<Job> jobsForThisSnapshot = levelZeroJobs.get(snapshotID);
 
         for (Map.Entry<String, PatternTreeNode> entry : singlePatternTreeNodesMap.entrySet()) {
             String ptnType = entry.getKey();
-            PatternTreeNode ptn = entry.getValue();
-            Set<String> validTypes = Collections.singleton(ptnType);
+            Map<String, List<Integer>> entityURIs = entityURIsByPTN.get(ptnType);
 
             graph.vertexSet().stream()
                     .filter(vertex -> vertex.getType().equals(ptnType))
                     .forEach(vertex -> {
-                        Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, vertex, diameter, validTypes);
-                        if (snapshotID != 0) {
-                            subgraph = graphService.updateChangedGraph(dataGraph.getNodeMap(), subgraph);
-                        }
-
-                        VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, ptn.getPattern(), false);
-                        if (results.isomorphismExists()) {
-                            Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                            int numOfMatchesInTimestamp = extractMatches(results.getMappings(), matches, ptn, entityURIsByPTN.get(ptn), snapshotID, vertexTypesToActiveAttributesMap);
-
-                            if (!matches.isEmpty()) {
-                                Job newJob = new Job(vertex, ptn);
-                                matchesPerTimestampsByPTN.get(ptn).get(snapshotID).addAll(matches);
-                                jobsForThisSnapshot.add(newJob);
-                            }
-                        }
+                        entityURIs.computeIfAbsent(vertex.getUri(), k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)))
+                                .set(snapshotID, entityURIs.get(vertex.getUri()).get(snapshotID) + 1);
                     });
         }
     }
 
     public int extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
-                              PatternTreeNode patternTreeNode, Map<String, List<Integer>> entityURIs, int timestamp,
-                              Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+                                  PatternTreeNode patternTreeNode, int timestamp, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         int numOfMatches = 0;
         while (iterator.hasNext()) {
             GraphMapping<Vertex, RelationshipEdge> result = iterator.next();
@@ -122,10 +101,6 @@ public class PatternService {
 
             if (literalsInMatch.size() >= patternTreeNode.getPattern().getPattern().vertexSet().size()) {
                 numOfMatches++;
-                if (entityURI != null) {
-                    entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)))
-                            .set(timestamp, entityURIs.get(entityURI).get(timestamp) + 1);
-                }
                 matches.add(literalsInMatch);
             }
         }

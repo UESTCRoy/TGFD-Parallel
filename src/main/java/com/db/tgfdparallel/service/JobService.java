@@ -18,13 +18,11 @@ public class JobService {
     private static final Logger logger = LoggerFactory.getLogger(JobService.class);
     private final AppConfig config;
     private final GraphService graphService;
-    private final ActiveMQService activeMQService;
 
     @Autowired
-    public JobService(AppConfig config, GraphService graphService, ActiveMQService activeMQService) {
+    public JobService(AppConfig config, GraphService graphService) {
         this.config = config;
         this.graphService = graphService;
-        this.activeMQService = activeMQService;
     }
 
     // Record which partition each vertex is assigned to, and assign edges accordingly.

@@ -68,7 +68,7 @@ public class TGFDService {
                 // TODO: 这里并不是用numberOfDeltas, 而是matches的pair数量
                 double tgfdSupport = calculateTGFDSupport(numberOfPairs, entities.size(), config.getTimestamp());
                 if (tgfdSupport < supportThreshold) {
-                    logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
+//                    logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
                     continue;
                 }
 
