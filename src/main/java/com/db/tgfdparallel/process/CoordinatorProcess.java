@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class CoordinatorProcess {
@@ -47,17 +48,17 @@ public class CoordinatorProcess {
         initializeWorkers();
 
         // Graph Path
-        List<String> allDataPath = config.getAllDataPath();
+        String firstGraphPath = config.getFirstGraphPath();
         List<String> splitGraphPath = config.getSplitGraphPath();
         String changeFilePath = config.getChangeFilePath();
         // AWS Data Preparation
         if (dataShipperService.isAmazonMode()) {
             changeFilePath = "/home/ec2-user/changeFile";
-            dataShipperService.awsCoordinatorDataPreparation(allDataPath, splitGraphPath, changeFilePath);
+//            dataShipperService.awsCoordinatorDataPreparation(allDataPath, splitGraphPath, changeFilePath);
         }
 
         // Generate histogram and send the histogram data to all workers
-        List<Graph<Vertex, RelationshipEdge>> graphLoaders = loadAllSnapshots(allDataPath);
+        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshots(Stream.of(firstGraphPath).collect(Collectors.toList()));
 
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
@@ -84,7 +85,7 @@ public class CoordinatorProcess {
         Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
 
         // Define jobs and assign them to the workers
-        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(allDataPath.get(0), vertexTypes).getGraph().getGraph();
+        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(firstGraphPath, vertexTypes).getGraph().getGraph();
         logger.info("The result of optimized first snapshot graph has {} vertices and {} edges", firstGraph.vertexSet().size(), firstGraph.edgeSet().size());
         Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
 
@@ -96,7 +97,7 @@ public class CoordinatorProcess {
         List<List<Change>> changesData = changeService.changeGenerator(changeFilePath, config.getTimestamp());
         logger.info("Generating change files for {} snapshots and got {} change files", config.getTimestamp(), changesData.size());
         // Send the changes to the workers
-        // 不搞异步通过changeFile生成new graph，与worker确认巴拉巴拉，我们一次性把change上传，然后让worker逐步生成new graph
+        // 一次性把change上传，然后让worker逐步生成new graph
         StringBuilder sb = new StringBuilder("#change");
         for (int i = 0; i < changesData.size(); i++) {
             String changeFileName = dataShipperService.changeShipped(changesData.get(i), i + 2);
@@ -129,20 +130,6 @@ public class CoordinatorProcess {
         logger.info("Check the status of the workers");
         activeMQService.initializeWorkersStatus();
         activeMQService.statusCheck();
-    }
-
-    private List<Graph<Vertex, RelationshipEdge>> loadAllSnapshots(List<String> allDataPath) {
-        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshot(allDataPath)
-                .stream()
-                .map(x -> x.getGraph().getGraph())
-                .collect(Collectors.toList());
-
-        for (int i = 0; i < graphLoaders.size(); i++) {
-            Graph<Vertex, RelationshipEdge> graph = graphLoaders.get(i);
-            logger.info("At timestamp {} we got {} vertex and {} edges", i, graph.vertexSet().size(), graph.edgeSet().size());
-        }
-
-        return graphLoaders;
     }
 
 }

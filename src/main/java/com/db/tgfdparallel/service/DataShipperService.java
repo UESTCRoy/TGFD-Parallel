@@ -86,7 +86,6 @@ public class DataShipperService {
                 }
             }
         }
-
         if (count > 0) {
             sendEdgesToWorkersForShipment(batchDataToBeShipped, listOfFiles);
             clearBatchData(batchDataToBeShipped);
@@ -171,18 +170,8 @@ public class DataShipperService {
 
     public void sendHistogramData(ProcessedHistogramData data) {
         if (isAmazonMode()) {
-//            s3Service.uploadObject(config.getBucketName(), "vertexHistogram", data.getVertexHistogram());
-//            s3Service.uploadObject(config.getBucketName(), "activeAttributesSet", data.getActiveAttributesSet());
-//            s3Service.uploadObject(config.getBucketName(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
-//            s3Service.uploadObject(config.getBucketName(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
-//            s3Service.uploadObject(config.getBucketName(), "sortedVertexHistogram", data.getSortedVertexHistogram());
             s3Service.uploadObject("processedHistogramData", data);
         } else {
-//            hdfsService.uploadObject(config.getHDFSPath(), "vertexHistogram", data.getVertexHistogram());
-//            hdfsService.uploadObject(config.getHDFSPath(), "activeAttributesSet", data.getActiveAttributesSet());
-//            hdfsService.uploadObject(config.getHDFSPath(), "vertexTypesToActiveAttributesMap", data.getVertexTypesToActiveAttributesMap());
-//            hdfsService.uploadObject(config.getHDFSPath(), "sortedFrequentEdgesHistogram", data.getSortedFrequentEdgesHistogram());
-//            hdfsService.uploadObject(config.getHDFSPath(), "sortedVertexHistogram", data.getSortedVertexHistogram());
             hdfsService.uploadObject(config.getHDFSPath(), "processedHistogramData", data);
         }
 
@@ -409,7 +398,7 @@ public class DataShipperService {
         logger.info("Finish Download From S3 to Instance");
     }
 
-    public String awsWorkerDataPreparation() {
+    public String workerDataPreparation() {
         String dataPath = config.getDataPath();
         if (isAmazonMode()) {
             String fileName = getFileNameFromPath(dataPath);

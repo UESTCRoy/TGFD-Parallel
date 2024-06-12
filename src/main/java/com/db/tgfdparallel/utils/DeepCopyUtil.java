@@ -20,7 +20,6 @@ public class DeepCopyUtil {
         kryo.register(Attribute.class);
         kryo.register(GraphLoader.class);
         kryo.register(VF2PatternGraph.class);
-        kryo.register(PatternTreeNode.class);
     }
 
     public static <T> T deepCopy(T original) {

@@ -93,6 +93,7 @@ public class LoaderService {
         return new GraphLoader(graph);
     }
 
+    // TODO: 待修改Vertex URI
     public GraphLoader loadDBPedia(Model model, Set<String> vertexTypes) {
         Map<String, Vertex> nodeMap = new HashMap<>();
         Graph<Vertex, RelationshipEdge> dataGraph = new DefaultDirectedGraph<>(RelationshipEdge.class);
@@ -130,8 +131,6 @@ public class LoaderService {
                     v = new Vertex(nodeURI, nodeType);
                     dataGraph.addVertex(v);
                     nodeMap.put(nodeURI, v);
-                } else {
-                    v.getTypes().add(nodeType);
                 }
             }
             logger.info("Done. Number of Vertex: " + nodeMap.size());
@@ -227,15 +226,13 @@ public class LoaderService {
     }
 
     private Vertex getOrCreateVertex(String id, String type, Map<String, Vertex> nodeMap, Graph<Vertex, RelationshipEdge> dataGraph) {
-        Vertex vertex = nodeMap.getOrDefault(id, null);
-        if (vertex == null) {
-            vertex = new Vertex(id, type);
-            dataGraph.addVertex(vertex);
-            nodeMap.put(id, vertex);
-        } else {
-            vertex.getTypes().add(type);
-        }
-        return vertex;
+        String uniqueId = id + "-" + type;
+
+        return nodeMap.computeIfAbsent(uniqueId, key -> {
+            Vertex newVertex = new Vertex(id, type);
+            dataGraph.addVertex(newVertex);
+            return newVertex;
+        });
     }
 
 }

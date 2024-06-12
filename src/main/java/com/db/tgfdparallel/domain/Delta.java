@@ -12,5 +12,5 @@ import java.time.Period;
 public class Delta implements Serializable {
     private Period min;
     private Period max;
-    private Duration granularity;
+//    private Duration granularity;
 }

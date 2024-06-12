@@ -19,12 +19,14 @@ public class HSpawnService {
     private final AppConfig config;
     private final PatternService patternService;
     private final TGFDService tgfdService;
+    private final DependencyService dependencyService;
 
     @Autowired
-    public HSpawnService(AppConfig config, PatternService patternService, TGFDService tgfdService) {
+    public HSpawnService(AppConfig config, PatternService patternService, TGFDService tgfdService, DependencyService dependencyService) {
         this.config = config;
         this.patternService = patternService;
         this.tgfdService = tgfdService;
+        this.dependencyService = dependencyService;
     }
 
     // TODO: 改造成异步的方式
@@ -59,7 +61,6 @@ public class HSpawnService {
             for (LiteralTreeNode previousLiteral : literalTreePreviousLevel) {
                 List<ConstantLiteral> parentsPathToRoot = getPathToRoot(previousLiteral);
 
-                // TODO: 啥是pruned
                 if (previousLiteral.isPruned()) {
                     logger.info("Could not expand pruned literal path.");
                     continue;
@@ -79,47 +80,33 @@ public class HSpawnService {
                     if (visitedPaths.contains(newPath)) {
                         continue;
                     }
-                    visitedPaths.add(newPath);
 
-                    // TODO: Check, 在deltaDiscovery line:60,发现没有delta的path,避免重复计算
-//                    boolean isSuperSetPath = false;
-//                    if (Util.hasSupportPruning && newPath.isSuperSetOfPath(copyOfNewPattern.getZeroEntityDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have no entities
-//                        System.out.println("Skip. Candidate literal path is a superset of zero-entity dependency.");
-//                        isSuperSetPath = true;
-                    // TODO: 在deltaDiscovery line:94
-//                    } else if (Util.hasMinimalityPruning && newPath.isSuperSetOfPath(copyOfNewPattern.getAllMinimalDependenciesOnThisPath())) { // Ensures we don't re-explore dependencies whose subsets have already have a general dependency
-//                        System.out.println("Skip. Candidate literal path is a superset of minimal dependency.");
-//                        isSuperSetPath = true;
-//                    }
-
-                    LiteralTreeNode node = new LiteralTreeNode(previousLiteral, constantLiteral);
-                    currentLiteralLevel.add(node);
-                    if (i != hSpawnLimit - 1) {
+                    List<AttributeDependency> allMinimalDependenciesOnThisPath = patternService.getAllMinimalDependenciesOnThisPath(patternTreeNode);
+                    if (dependencyService.isSuperSetOfPath(newPath, allMinimalDependenciesOnThisPath)) {
                         continue;
                     }
 
-                    //TODO: Check
-//                    if (Util.onlyInterestingTGFDs) { // Ensures all vertices are involved in dependency
-//                        if (Util.literalPathIsMissingTypesInPattern(literalTreeNode.getPathToRoot(), copyOfNewPattern.getGraph().vertexSet())) {
-//                            System.out.println("Skip Delta Discovery. Literal path does not involve all pattern vertices.");
-//                            continue;
-//                        }
-//                    }
-                    PatternTreeNode copyOfNewPattern = DeepCopyUtil.deepCopy(patternTreeNode);
-                    addDependencyAttributesToPattern(copyOfNewPattern.getPattern(), newPath);
+                    LiteralTreeNode node = new LiteralTreeNode(previousLiteral, constantLiteral);
+                    currentLiteralLevel.add(node);
+
+                    if (patternService.literalPathIsMissingTypesInPattern(getPathToRoot(node), graph.vertexSet())) {
+                        logger.info("Skip Delta Discovery. Literal path does not involve all pattern vertices.");
+                        continue;
+                    }
+
+                    visitedPaths.add(newPath);
+
+                    VF2PatternGraph patternGraphCopy = DeepCopyUtil.deepCopy(patternTreeNode.getPattern());
+                    addDependencyAttributesToPattern(patternGraphCopy, newPath);
                     Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = findEntities(newPath, matchesPerTimestamps);
-                    Map<Pair, List<TreeSet<Pair>>> deltaToPairsMap = new HashMap<>();
                     List<Pair> candidatePairs = new ArrayList<>();
 
-                    List<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(copyOfNewPattern, newPath.getRhs(), entities, candidatePairs);
+                    List<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs);
+                    logger.info("There are {} constant TGFDs discovered for dependency {}", constantTGFD.size(), newPath);
                     result.get(0).addAll(constantTGFD);
 
                     if (!candidatePairs.isEmpty()) {
-//                        int totalSize = 0;
-//                        for (List<Map.Entry<ConstantLiteral, List<Integer>>> list : entities.values()) {
-//                            totalSize += list.size();
-//                        }
-                        List<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(copyOfNewPattern, patternTreeNode.getPatternSupport(),
+                        List<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(patternTreeNode, patternTreeNode.getPatternSupport(),
                                 newPath, candidatePairs, entities.size());
                         result.get(1).addAll(generalTGFD);
                     }
@@ -148,29 +135,30 @@ public class HSpawnService {
                 .collect(Collectors.toMap(ConstantLiteral::getVertexType, Function.identity()));
 
         for (Vertex v : patternForDependency.getPattern().vertexSet()) {
-            for (String vType : v.getTypes()) {
-                ConstantLiteral constantLiteral = attributeMap.getOrDefault(vType, null);
-                if (constantLiteral != null) {
-                    Attribute attribute = new Attribute(constantLiteral.getAttrName());
-                    v.getAttributes().add(attribute);
-                }
+            String vType = v.getType();
+            ConstantLiteral constantLiteral = attributeMap.getOrDefault(vType, null);
+            if (constantLiteral != null) {
+                Attribute attribute = new Attribute(constantLiteral.getAttrName());
+                v.getAttributes().add(attribute);
             }
         }
     }
 
-    public Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> findEntities(AttributeDependency attributes,
+    public Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> findEntities(AttributeDependency dependency,
                                                                                                    List<Set<Set<ConstantLiteral>>> matchesPerTimestamps) {
+        long startTime = System.currentTimeMillis();
+
         Map<Set<ConstantLiteral>, Map<ConstantLiteral, List<Integer>>> entitiesWithRHSvalues = new HashMap<>();
         Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entitiesWithSortedRHSvalues = new HashMap<>();
-        String yVertexType = attributes.getRhs().getVertexType();
-        String yAttrName = attributes.getRhs().getAttrName();
-        Set<ConstantLiteral> xAttributes = attributes.getLhs();
+        String yVertexType = dependency.getRhs().getVertexType();
+        String yAttrName = dependency.getRhs().getAttrName();
+        Set<ConstantLiteral> xAttributes = dependency.getLhs();
 
         for (int timestamp = 0; timestamp < matchesPerTimestamps.size(); timestamp++) {
             Set<Set<ConstantLiteral>> matchesInOneTimeStamp = matchesPerTimestamps.get(timestamp);
             if (!matchesInOneTimeStamp.isEmpty()) {
                 for (Set<ConstantLiteral> match : matchesInOneTimeStamp) {
-                    if (match.size() < attributes.getLhs().size() + 1) {
+                    if (match.size() < dependency.getLhs().size() + 1) {
                         continue;
                     }
 
@@ -217,6 +205,9 @@ public class HSpawnService {
                     .collect(Collectors.toList());
             entitiesWithSortedRHSvalues.put(entityEntry.getKey(), sortedRhsMapOfEntity);
         }
+        long endTime = System.currentTimeMillis();
+        logger.info("Time to find entities {}: {}", dependency, (endTime - startTime));
+
         return entitiesWithSortedRHSvalues;
     }
 
