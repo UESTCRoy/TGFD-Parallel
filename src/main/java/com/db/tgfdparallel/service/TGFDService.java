@@ -36,7 +36,7 @@ public class TGFDService {
         List<TGFD> result = new ArrayList<>();
         int level = patternNode.getPattern().getPattern().vertexSet().size();
         VF2PatternGraph pattern = patternNode.getPattern();
-        List<AttributeDependency> allMinimalConstantDependenciesOnThisPath = patternService.getAllMinimalConstantDependenciesOnThisPath(patternNode);
+//        List<AttributeDependency> allMinimalConstantDependenciesOnThisPath = patternService.getAllMinimalConstantDependenciesOnThisPath(patternNode);
         double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
 
         for (Map.Entry<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
@@ -88,7 +88,7 @@ public class TGFDService {
 //                long constantTGFDKeyEndTime = System.currentTimeMillis();
 //                logger.info("Time taken to check super set of path and subset of delta: {} ms", (constantTGFDKeyEndTime - constantTGFDKeyStartTime));
 
-                patternService.addMinimalConstantDependency(patternNode, constantPath);
+//                patternService.addMinimalConstantDependency(patternNode, constantPath);
 
                 // Coordinator处，delta, support 需要重新计算
                 TGFD candidateConstantTGFD = new TGFD(newPattern, minMaxPair, newDependency, 0.0,
@@ -158,7 +158,7 @@ public class TGFDService {
             tgfds.add(tgfd);
         }
 
-        if (!tgfds.isEmpty()) {
+        if (!tgfds.isEmpty() && literalPath.getLhs().size() > 1) {
             patternService.addMinimalDependency(patternTreeNode, literalPath);
         }
         long endTime = System.currentTimeMillis();

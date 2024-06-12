@@ -1,6 +1,5 @@
 package com.db.tgfdparallel.service;
 
-import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.Change;
 import com.db.tgfdparallel.domain.ChangeType;
 import com.db.tgfdparallel.utils.FileUtil;

@@ -263,7 +263,7 @@ public class WorkerProcess {
                 .filter(vertex -> entityURIs.containsKey(vertex.getUri()) )
                 .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
-                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, finalLevel, validTypes);
+                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, 1, validTypes);
                     VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results =
                             graphService.checkIsomorphism(subgraph, newPattern.getPattern(), false);
 
