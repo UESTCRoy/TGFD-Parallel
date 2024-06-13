@@ -19,4 +19,12 @@ public class VF2PatternGraph implements Serializable {
         this.centerVertexType = centerVertexType;
         this.centerVertex = centerVertex;
     }
+
+    @Override
+    public String toString() {
+        return "VF2PatternGraph{" +
+                "centerVertex=" + centerVertex +
+                ", pattern=" + pattern +
+                '}';
+    }
 }

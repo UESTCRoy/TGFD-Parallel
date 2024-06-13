@@ -4,13 +4,14 @@ import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.utils.DeepCopyUtil;
 import com.db.tgfdparallel.utils.MathUtil;
+import com.google.common.hash.Hashing;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.time.Period;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -183,7 +184,7 @@ public class TGFDService {
             sb.append(data.getVertexType()).append(data.getAttrName()).append(data.getAttrValue());
         }
         sb.append(literal.getVertexType()).append(literal.getAttrName());
-        return sb.hashCode();
+        return hashString(sb.toString());
     }
 
     public int getGeneralTGFDKey(DataDependency dependency) {
@@ -194,7 +195,7 @@ public class TGFDService {
             sb.append(data.getVertexType()).append(data.getAttrName());
         }
         sb.append(literal.getVertexType()).append(literal.getAttrName());
-        return sb.hashCode();
+        return hashString(sb.toString());
     }
 
     private Pair getMinMaxPair(List<Integer> timestampCounts) {
@@ -400,6 +401,10 @@ public class TGFDService {
             }
         }
         constantTGFDResults.removeAll(toRemove);
+    }
+
+    private int hashString(String input) {
+        return Hashing.murmur3_32().hashString(input, StandardCharsets.UTF_8).asInt();
     }
 
 }

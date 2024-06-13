@@ -157,15 +157,27 @@ public class WorkerProcess {
         logger.info("======================================");
 
         // 生成constant与general的TGFD Map，返回给Coordinator汇总
+        int constantCounter = 0;
         for (TGFD data : constantTGFDs) {
             int hashKey = tgfdService.getConstantTGFDKey(data.getDependency());
-            List<TGFD> constantTGFDsList = constantTGFDMap.computeIfAbsent(hashKey, k -> new ArrayList<>());
-            constantTGFDsList.add(data);
+            if (!constantTGFDMap.containsKey(hashKey)) {
+                constantTGFDMap.put(hashKey, new ArrayList<>(Arrays.asList(data)));
+                constantCounter++;
+            }
+//            if (constantCounter == 50000) {
+//                break;
+//            }
         }
+        int generalCounter = 0;
         for (TGFD data : generalTGFDs) {
             int hashKey = tgfdService.getGeneralTGFDKey(data.getDependency());
-            List<TGFD> generalTGFDsList = generalTGFDMap.computeIfAbsent(hashKey, k -> new ArrayList<>());
-            generalTGFDsList.add(data);
+            if (!generalTGFDMap.containsKey(hashKey)) {
+                generalTGFDMap.put(hashKey, new ArrayList<>(Arrays.asList(data)));
+                generalCounter++;
+            }
+//            if (generalCounter == 50000) {
+//                break;
+//            }
         }
 
         // Send data(Constant TGFDs) back to coordinator

@@ -36,4 +36,12 @@ public class PatternTreeNode implements Serializable {
         this.minimalDependencies = new ArrayList<>();
         this.minimalConstantDependencies = new ArrayList<>();
     }
+
+    @Override
+    public String toString() {
+        return "PatternTreeNode{" +
+                "pattern=" + pattern.getPattern() +
+                ", patternSupport=" + patternSupport +
+                '}';
+    }
 }

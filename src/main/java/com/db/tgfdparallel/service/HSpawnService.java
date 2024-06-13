@@ -90,7 +90,7 @@ public class HSpawnService {
                     currentLiteralLevel.add(node);
 
                     if (patternService.literalPathIsMissingTypesInPattern(getPathToRoot(node), graph.vertexSet())) {
-                        logger.info("Skip Delta Discovery. Literal path does not involve all pattern vertices.");
+//                        logger.info("Skip Delta Discovery. Literal path does not involve all pattern vertices.");
                         continue;
                     }
 

@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,4 +51,26 @@ public class FileUtil {
             e.printStackTrace();
         }
     }
+
+//    public static String hashString(String input) {
+//        try {
+//            MessageDigest md = MessageDigest.getInstance("MD5");
+//            byte[] hashBytes = md.digest(input.getBytes());
+//            return bytesToHex(hashBytes);
+//        } catch (NoSuchAlgorithmException e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
+//
+//    private static String bytesToHex(byte[] bytes) {
+//        StringBuilder hexString = new StringBuilder(2 * bytes.length);
+//        for (byte b : bytes) {
+//            String hex = Integer.toHexString(0xff & b);
+//            if (hex.length() == 1) {
+//                hexString.append('0');
+//            }
+//            hexString.append(hex);
+//        }
+//        return hexString.toString();
+//    }
 }
