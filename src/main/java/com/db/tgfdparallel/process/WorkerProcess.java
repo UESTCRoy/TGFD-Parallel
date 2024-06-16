@@ -88,10 +88,10 @@ public class WorkerProcess {
         }
         evaluatePatternSupport(patternTreeNodes, vertexHistogram);
 
-        List<TGFD> constantTGFDs = new ArrayList<>();
-        List<TGFD> generalTGFDs = new ArrayList<>();
-        Map<Integer, List<TGFD>> constantTGFDMap = new HashMap<>();
-        Map<Integer, List<TGFD>> generalTGFDMap = new HashMap<>();
+        Set<TGFD> constantTGFDs = new HashSet<>();
+        Set<TGFD> generalTGFDs = new HashSet<>();
+        Map<Integer, Set<TGFD>> constantTGFDMap = new HashMap<>();
+        Map<Integer, Set<TGFD>> generalTGFDMap = new HashMap<>();
 
         // Start VSpawn
         PatternTree patternTree = new PatternTree();
@@ -160,10 +160,8 @@ public class WorkerProcess {
         int constantCounter = 0;
         for (TGFD data : constantTGFDs) {
             int hashKey = tgfdService.getConstantTGFDKey(data.getDependency());
-            if (!constantTGFDMap.containsKey(hashKey)) {
-                constantTGFDMap.put(hashKey, new ArrayList<>(Arrays.asList(data)));
-                constantCounter++;
-            }
+            constantTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>()).add(data);
+            constantCounter++;
 //            if (constantCounter == 50000) {
 //                break;
 //            }
@@ -171,10 +169,8 @@ public class WorkerProcess {
         int generalCounter = 0;
         for (TGFD data : generalTGFDs) {
             int hashKey = tgfdService.getGeneralTGFDKey(data.getDependency());
-            if (!generalTGFDMap.containsKey(hashKey)) {
-                generalTGFDMap.put(hashKey, new ArrayList<>(Arrays.asList(data)));
-                generalCounter++;
-            }
+            generalTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>()).add(data);
+            generalCounter++;
 //            if (generalCounter == 50000) {
 //                break;
 //            }

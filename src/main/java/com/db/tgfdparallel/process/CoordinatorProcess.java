@@ -109,11 +109,11 @@ public class CoordinatorProcess {
         }
 
         // 处理Constant TGFD
-        Map<Integer, List<TGFD>> constantTGFDMap = dataShipperService.downloadConstantTGFD("constant");
+        Map<Integer, Set<TGFD>> constantTGFDMap = dataShipperService.downloadConstantTGFD("constant");
         tgfdService.processConstantTGFD(constantTGFDMap);
 
         // 处理General TGFD
-        Map<Integer, List<TGFD>> generalTGFDMap = dataShipperService.downloadConstantTGFD("general");
+        Map<Integer, Set<TGFD>> generalTGFDMap = dataShipperService.downloadConstantTGFD("general");
         tgfdService.processGeneralTGFD(generalTGFDMap);
 
         FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");

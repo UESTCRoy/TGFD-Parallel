@@ -14,6 +14,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class FileUtil {
     public static JSONArray readJsonFile(String filePath) {
@@ -37,9 +38,9 @@ public class FileUtil {
         return null;
     }
 
-    public static void saveConstantTGFDsToFile(Map<Integer, List<TGFD>> data, String filename) {
+    public static void saveConstantTGFDsToFile(Map<Integer, Set<TGFD>> data, String filename) {
         try (PrintWriter out = new PrintWriter(new FileWriter(filename))) {
-            for (Map.Entry<Integer, List<TGFD>> entry : data.entrySet()) {
+            for (Map.Entry<Integer, Set<TGFD>> entry : data.entrySet()) {
                 out.println("Value: ");
                 for (TGFD tgfd : entry.getValue()) {
                     out.println(tgfd.toString());

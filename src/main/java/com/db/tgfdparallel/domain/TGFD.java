@@ -2,26 +2,27 @@ package com.db.tgfdparallel.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 
 @Data
 @AllArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class TGFD implements Serializable {
-    private VF2PatternGraph pattern;
+    @EqualsAndHashCode.Include
     private Pair delta;
+    @EqualsAndHashCode.Include
     private DataDependency dependency;
     private Double tgfdSupport;
-    private Double patternSupport;
     private int level;
     private int entitySize;
 
     @Override
     public String toString() {
         return "TGFD{" +
-                "pattern=" + pattern.getPattern() +
+                "dependency=" + dependency +
                 ", delta=" + delta +
-                ", dependency=" + dependency +
                 ", tgfdSupport=" + tgfdSupport +
                 ", level=" + level +
                 '}';

@@ -311,7 +311,7 @@ public class DataShipperService {
         return obj;
     }
 
-    public void uploadTGFD(Map<Integer, List<TGFD>> constantTGFDMap, Map<Integer, List<TGFD>> generalTGFDMap) {
+    public void uploadTGFD(Map<Integer, Set<TGFD>> constantTGFDMap, Map<Integer, Set<TGFD>> generalTGFDMap) {
         String constantKey = config.getNodeName() + "_constantTGFD";
         String generalKey = config.getNodeName() + "_generalTGFD";
         if (isAmazonMode()) {
@@ -329,12 +329,12 @@ public class DataShipperService {
         activeMQService.closeProducer();
     }
 
-    public Map<Integer, List<TGFD>> downloadConstantTGFD(String type) {
-        Map<Integer, List<TGFD>> obj = new HashMap<>();
+    public Map<Integer, Set<TGFD>> downloadConstantTGFD(String type) {
+        Map<Integer, Set<TGFD>> obj = new HashMap<>();
         try {
             List<String> TGFDsFile = activeMQService.receiveTGFDsFromWorker(type);
             for (String fileName : TGFDsFile) {
-                Map<Integer, List<TGFD>> data = (Map<Integer, List<TGFD>>) downloadObject(fileName);
+                Map<Integer, Set<TGFD>> data = (Map<Integer, Set<TGFD>>) downloadObject(fileName);
                 data.forEach((key, value) ->
                         obj.merge(key, value, (oldValue, newValue) -> {
                             oldValue.addAll(newValue);

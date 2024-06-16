@@ -21,20 +21,18 @@ public class TGFDService {
     private static final Logger logger = LoggerFactory.getLogger(TGFDService.class);
     private final AppConfig config;
     private final PatternService patternService;
-    private final DependencyService dependencyService;
 
     @Autowired
-    public TGFDService(AppConfig config, PatternService patternService, DependencyService dependencyService) {
+    public TGFDService(AppConfig config, PatternService patternService) {
         this.config = config;
         this.patternService = patternService;
-        this.dependencyService = dependencyService;
     }
 
-    public List<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
+    public Set<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
                                            Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs) {
         long startTime = System.currentTimeMillis();
 
-        List<TGFD> result = new ArrayList<>();
+        Set<TGFD> result = new HashSet<>();
         int level = patternNode.getPattern().getPattern().vertexSet().size();
         VF2PatternGraph pattern = patternNode.getPattern();
 //        List<AttributeDependency> allMinimalConstantDependenciesOnThisPath = patternService.getAllMinimalConstantDependenciesOnThisPath(patternNode);
@@ -92,8 +90,7 @@ public class TGFDService {
 //                patternService.addMinimalConstantDependency(patternNode, constantPath);
 
                 // Coordinator处，delta, support 需要重新计算
-                TGFD candidateConstantTGFD = new TGFD(newPattern, minMaxPair, newDependency, 0.0,
-                        patternNode.getPatternSupport(), level, entities.size());
+                TGFD candidateConstantTGFD = new TGFD(minMaxPair, newDependency, 0.0, level, entities.size());
                 result.add(candidateConstantTGFD);
             }
             long rhsDiscoveryEndTime = System.currentTimeMillis();
@@ -134,10 +131,10 @@ public class TGFDService {
         constantPath.setRhs(new ConstantLiteral(yVertexType, yAttrName, attrValue));
     }
 
-    public List<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, double patternSupport, AttributeDependency literalPath,
+    public Set<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, double patternSupport, AttributeDependency literalPath,
                                           List<Pair> deltas, int entitySize) {
         long startTime = System.currentTimeMillis();
-        List<TGFD> tgfds = new ArrayList<>();
+        Set<TGFD> tgfds = new HashSet<>();
         List<Pair> candidateDeltas = mergeOverlappingPairs(deltas);
         /*
             咱就不在worker计算support了，把相同Literal Path获得的General TGFD的Delta合并
@@ -155,7 +152,7 @@ public class TGFDService {
 
             int level = patternTreeNode.getPattern().getPattern().vertexSet().size();
 
-            TGFD tgfd = new TGFD(patternTreeNode.getPattern(), delta, generalDependency, 0.0, patternSupport, level, entitySize);
+            TGFD tgfd = new TGFD(delta, generalDependency, 0.0, level, entitySize);
             tgfds.add(tgfd);
         }
 
@@ -269,65 +266,66 @@ public class TGFDService {
         return pair1.getMax() >= pair2.getMin() && pair1.getMin() <= pair2.getMax();
     }
 
-    public void processConstantTGFD(Map<Integer, List<TGFD>> constantTGFDMap) {
+    public void processConstantTGFD(Map<Integer, Set<TGFD>> constantTGFDMap) {
         int numOfPositiveTGFDs = 0;
         int numOfNegativeTGFDs = 0;
 
-        Iterator<Map.Entry<Integer, List<TGFD>>> iterator = constantTGFDMap.entrySet().iterator();
+        Iterator<Map.Entry<Integer, Set<TGFD>>> iterator = constantTGFDMap.entrySet().iterator();
 
         while (iterator.hasNext()) {
-            Map.Entry<Integer, List<TGFD>> entry = iterator.next();
-            List<TGFD> constantTGFDsList = entry.getValue();
+            Map.Entry<Integer, Set<TGFD>> entry = iterator.next();
+            Set<TGFD> constantTGFDs = entry.getValue();
             Integer hashKey = entry.getKey();
 
-            if (constantTGFDsList.size() == 1) {
-                TGFD tgfd = updateTGFDWithSupport(constantTGFDsList.get(0));
+            if (constantTGFDs.size() == 1) {
+                TGFD tgfd = updateTGFDWithSupport(constantTGFDs.iterator().next());
 
                 if (tgfd.getTgfdSupport() >= config.getTgfdTheta()) {
                     numOfPositiveTGFDs++;
-                    constantTGFDMap.put(hashKey, Collections.singletonList(tgfd));
+                    constantTGFDMap.put(hashKey, new HashSet<>(Collections.singleton(tgfd)));
                 } else {
                     iterator.remove();
                 }
             } else {
-                Map<String, List<TGFD>> tgfdMap = constantTGFDsList.stream()
+                Map<String, Set<TGFD>> tgfdMap = constantTGFDs.stream()
                         .collect(Collectors.groupingBy(tgfd -> {
                             ConstantLiteral constantLiteral = (ConstantLiteral) tgfd.getDependency().getY().get(0);
                             return constantLiteral.getAttrValue();
-                        }));
+                        }, Collectors.toSet()));
 
+                // 对于有相同rhs attr value的tgfd进行delta merge
                 for (String key : tgfdMap.keySet()) {
-                    List<TGFD> tgfds = tgfdMap.get(key);
-                    List<TGFD> mergeResult = mergeAndRecreateTGFD(tgfds);
+                    Set<TGFD> tgfds = tgfdMap.get(key);
+                    Set<TGFD> mergeResult = mergeAndRecreateTGFD(tgfds);
                     tgfdMap.put(key, mergeResult);
                 }
 
-                List<TGFD> combinedList = tgfdMap.values().stream()
-                        .flatMap(List::stream)
-                        .collect(Collectors.toList());
+                Set<TGFD> combinedSet = tgfdMap.values().stream()
+                        .flatMap(Set::stream)
+                        .collect(Collectors.toSet());
 
-                List<TGFD> constantTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
+                Set<TGFD> constantTGFDResults = updateAndFilterTGFDListWithSupport(combinedSet);
                 removeOverlappingDeltas(constantTGFDResults);
                 constantTGFDMap.put(hashKey, constantTGFDResults);
 
-                numOfNegativeTGFDs += constantTGFDsList.size() - constantTGFDResults.size();
+                numOfNegativeTGFDs += constantTGFDs.size() - constantTGFDResults.size();
             }
         }
 
         logger.info("There are {} Positive TGFDs and {} Negative TGFDs", numOfPositiveTGFDs, numOfNegativeTGFDs);
     }
 
-    public void processGeneralTGFD(Map<Integer, List<TGFD>> generalTGFDMap) {
+    public void processGeneralTGFD(Map<Integer, Set<TGFD>> generalTGFDMap) {
         int count = 0;
-        Iterator<Map.Entry<Integer, List<TGFD>>> iterator = generalTGFDMap.entrySet().iterator();
+        Iterator<Map.Entry<Integer, Set<TGFD>>> iterator = generalTGFDMap.entrySet().iterator();
 
         while (iterator.hasNext()) {
-            Map.Entry<Integer, List<TGFD>> entry = iterator.next();
-            List<TGFD> tgfds = entry.getValue();
+            Map.Entry<Integer, Set<TGFD>> entry = iterator.next();
+            Set<TGFD> tgfds = entry.getValue();
             Integer key = entry.getKey();
 
-            List<TGFD> combinedList = mergeAndRecreateTGFD(tgfds);
-            List<TGFD> generalTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
+            Set<TGFD> combinedList = mergeAndRecreateTGFD(tgfds);
+            Set<TGFD> generalTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
 
             count += generalTGFDResults.size();
 
@@ -340,8 +338,10 @@ public class TGFDService {
         logger.info("There are {} General TGFDs", count);
     }
 
-    private List<TGFD> mergeAndRecreateTGFD(List<TGFD> tgfds) {
-        TGFD originalTGFD = tgfds.get(0);
+    private Set<TGFD> mergeAndRecreateTGFD(Set<TGFD> tgfds) {
+        if (tgfds.isEmpty()) return tgfds;
+
+        TGFD originalTGFD = tgfds.iterator().next();
 
         List<Pair> deltas = tgfds.stream()
                 .map(TGFD::getDelta)
@@ -353,14 +353,12 @@ public class TGFDService {
         if (mergedDeltas.size() < deltas.size()) {
             return mergedDeltas.stream()
                     .map(mergedDelta -> new TGFD(
-                            originalTGFD.getPattern(),
                             mergedDelta,
                             originalTGFD.getDependency(),
                             originalTGFD.getTgfdSupport(),
-                            originalTGFD.getPatternSupport(),
                             originalTGFD.getLevel(),
                             originalTGFD.getEntitySize()))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
         } else {
             return tgfds;
         }
@@ -374,10 +372,13 @@ public class TGFDService {
         return tgfd;
     }
 
-    private List<TGFD> updateAndFilterTGFDListWithSupport(List<TGFD> tgfds) {
+    private Set<TGFD> updateAndFilterTGFDListWithSupport(Set<TGFD> tgfds) {
+        if (tgfds.isEmpty()) return tgfds;
+
         int entitySize = tgfds.stream()
                 .mapToInt(TGFD::getEntitySize)
                 .sum();
+
         tgfds.forEach(tgfd -> {
             Pair delta = tgfd.getDelta();
             long numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
@@ -387,16 +388,18 @@ public class TGFDService {
 
         return tgfds.stream()
                 .filter(tgfd -> tgfd.getTgfdSupport() >= config.getTgfdTheta())
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
     }
 
-    private void removeOverlappingDeltas(List<TGFD> constantTGFDResults) {
+    private void removeOverlappingDeltas(Set<TGFD> constantTGFDResults) {
         Set<TGFD> toRemove = new HashSet<>();
-        for (int i = 0; i < constantTGFDResults.size(); i++) {
-            for (int j = i + 1; j < constantTGFDResults.size(); j++) {
-                if (checkDeltaOverlapping(constantTGFDResults.get(i).getDelta(), constantTGFDResults.get(j).getDelta())) {
-                    toRemove.add(constantTGFDResults.get(i));
-                    toRemove.add(constantTGFDResults.get(j));
+        List<TGFD> tgfdList = new ArrayList<>(constantTGFDResults);
+
+        for (int i = 0; i < tgfdList.size(); i++) {
+            for (int j = i + 1; j < tgfdList.size(); j++) {
+                if (checkDeltaOverlapping(tgfdList.get(i).getDelta(), tgfdList.get(j).getDelta())) {
+                    toRemove.add(tgfdList.get(i));
+                    toRemove.add(tgfdList.get(j));
                 }
             }
         }

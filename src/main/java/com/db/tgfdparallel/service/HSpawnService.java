@@ -101,12 +101,12 @@ public class HSpawnService {
                     Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = findEntities(newPath, matchesPerTimestamps);
                     List<Pair> candidatePairs = new ArrayList<>();
 
-                    List<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs);
+                    Set<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs);
                     logger.info("There are {} constant TGFDs discovered for dependency {}", constantTGFD.size(), newPath);
                     result.get(0).addAll(constantTGFD);
 
                     if (!candidatePairs.isEmpty()) {
-                        List<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(patternTreeNode, patternTreeNode.getPatternSupport(),
+                        Set<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(patternTreeNode, patternTreeNode.getPatternSupport(),
                                 newPath, candidatePairs, entities.size());
                         result.get(1).addAll(generalTGFD);
                     }
