@@ -311,22 +311,45 @@ public class DataShipperService {
         return obj;
     }
 
-    public void uploadTGFD(Map<Integer, Set<TGFD>> constantTGFDMap, Map<Integer, Set<TGFD>> generalTGFDMap) {
+    public void uploadTGFD(Map<Integer, Integer> dependencyMap, Map<Integer, Set<TGFD>> constantTGFDMap, Map<Integer, Set<TGFD>> generalTGFDMap) {
+        String dependencyKey = config.getNodeName() + "_dependency";
         String constantKey = config.getNodeName() + "_constantTGFD";
         String generalKey = config.getNodeName() + "_generalTGFD";
         if (isAmazonMode()) {
+            s3Service.uploadObject(dependencyKey, dependencyMap);
             s3Service.uploadObject(constantKey, constantTGFDMap);
             s3Service.uploadObject(generalKey, generalTGFDMap);
         } else {
+            hdfsService.uploadObject(config.getHDFSPath(), dependencyKey, dependencyMap);
             hdfsService.uploadObject(config.getHDFSPath(), constantKey, constantTGFDMap);
             hdfsService.uploadObject(config.getHDFSPath(), generalKey, generalTGFDMap);
         }
 
         activeMQService.connectProducer();
+        activeMQService.send("dependency-tgfd", dependencyKey);
         activeMQService.send("constant-tgfd", constantKey);
         activeMQService.send("general-tgfd", generalKey);
         logger.info("Worker " + config.getNodeName() + "send TGFDs back to coordinator successfully!");
         activeMQService.closeProducer();
+    }
+
+    public Map<Integer, Integer> downloadDependencyMap(String type) {
+        Map<Integer, Integer> obj = new HashMap<>();
+        try {
+            List<String> TGFDsFile = activeMQService.receiveTGFDsFromWorker(type);
+            for (String fileName : TGFDsFile) {
+                Map<Integer, Integer> data = (Map<Integer, Integer>) downloadObject(fileName);
+                logger.info("Got {} {} TGFDs from {}", data.size(), type, fileName);
+                for (Map.Entry<Integer, Integer> entry : data.entrySet()) {
+                    obj.merge(entry.getKey(), entry.getValue(), Integer::sum);
+                }
+            }
+        } catch (IOException e) {
+            logger.error("Error while downloading {} TGFD: " + e.getMessage(), type, e);
+        } catch (ClassCastException e) {
+            logger.error("Error while casting downloaded object to Map<Integer, Set<TGFD>>: " + e.getMessage(), e);
+        }
+        return obj;
     }
 
     public Map<Integer, Set<TGFD>> downloadConstantTGFD(String type) {

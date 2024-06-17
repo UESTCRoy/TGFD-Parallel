@@ -45,6 +45,7 @@ public class WorkerProcess {
 
     private Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN;
     private Map<String, Map<String, List<Integer>>> entityURIsByPTN; // first key: centerVertexType, second key: entityURI
+    private Map<Integer, Integer> dependencyNumberMap = new HashMap<>();
 
     public void start() {
         // Send the status to the coordinator
@@ -143,7 +144,7 @@ public class WorkerProcess {
                 matchesPerTimestampsByPTN.put(newPattern, matchesPerTimestamps);
 
                 // 计算新pattern的HSpawn
-                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps);
+                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps, dependencyNumberMap);
                 if (tgfds.size() == 2 && level > 1) {
                     constantTGFDs.addAll(tgfds.get(0));
                     generalTGFDs.addAll(tgfds.get(1));
@@ -178,7 +179,7 @@ public class WorkerProcess {
 
         // Send data(Constant TGFDs) back to coordinator
         logger.info("Send {} constant and {} general TGFDs to Coordinator", constantTGFDs.size(), generalTGFDs.size());
-        dataShipperService.uploadTGFD(constantTGFDMap, generalTGFDMap);
+        dataShipperService.uploadTGFD(dependencyNumberMap, constantTGFDMap, generalTGFDMap);
         logger.info(config.getNodeName() + " Done");
         if (dataShipperService.isAmazonMode()) {
             s3Service.stopInstance();
@@ -268,7 +269,7 @@ public class WorkerProcess {
         int finalLevel = level;
         graph.vertexSet().stream()
                 .filter(vertex -> vertex.getType().equals(centerVertexType))
-                .filter(vertex -> entityURIs.containsKey(vertex.getUri()) )
+                .filter(vertex -> entityURIs.containsKey(vertex.getUri()))
                 .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
                     Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, 1, validTypes);

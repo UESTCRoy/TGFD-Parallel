@@ -31,7 +31,7 @@ public class HSpawnService {
 
     // TODO: 改造成异步的方式
     public List<List<TGFD>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
-                                          List<Set<Set<ConstantLiteral>>> matchesPerTimestamps) {
+                                          List<Set<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
         List<List<TGFD>> result = Collections.nCopies(2, new ArrayList<TGFD>())
                 .stream()
                 .map(ArrayList::new)
@@ -101,13 +101,15 @@ public class HSpawnService {
                     Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = findEntities(newPath, matchesPerTimestamps);
                     List<Pair> candidatePairs = new ArrayList<>();
 
-                    Set<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs);
+                    int dependencyKey = generateDependencyKey(newPath);
+                    dependencyNumberMap.put(dependencyKey, entities.size());
+
+                    Set<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs, dependencyKey);
                     logger.info("There are {} constant TGFDs discovered for dependency {}", constantTGFD.size(), newPath);
                     result.get(0).addAll(constantTGFD);
 
                     if (!candidatePairs.isEmpty()) {
-                        Set<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(patternTreeNode, patternTreeNode.getPatternSupport(),
-                                newPath, candidatePairs, entities.size());
+                        Set<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(patternTreeNode, newPath, candidatePairs);
                         result.get(1).addAll(generalTGFD);
                     }
                 }
@@ -218,5 +220,14 @@ public class HSpawnService {
             }
         }
         return false;
+    }
+
+    private int generateDependencyKey(AttributeDependency dependency) {
+        StringBuilder key = new StringBuilder();
+        for (ConstantLiteral literal : dependency.getLhs()) {
+            key.append(literal.getVertexType()).append(literal.getAttrName());
+        }
+        key.append(dependency.getRhs().getVertexType()).append(dependency.getRhs().getAttrName());
+        return tgfdService.hashString(key.toString());
     }
 }

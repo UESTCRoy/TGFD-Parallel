@@ -108,9 +108,11 @@ public class CoordinatorProcess {
             logger.info("Change objects have been shared with '" + worker + "' successfully");
         }
 
+        Map<Integer, Integer> dependencyMap = dataShipperService.downloadDependencyMap("dependency");
+
         // 处理Constant TGFD
         Map<Integer, Set<TGFD>> constantTGFDMap = dataShipperService.downloadConstantTGFD("constant");
-        tgfdService.processConstantTGFD(constantTGFDMap);
+        tgfdService.processConstantTGFD(constantTGFDMap, dependencyMap);
 
         // 处理General TGFD
         Map<Integer, Set<TGFD>> generalTGFDMap = dataShipperService.downloadConstantTGFD("general");

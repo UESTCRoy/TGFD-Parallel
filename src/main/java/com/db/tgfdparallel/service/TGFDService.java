@@ -29,7 +29,7 @@ public class TGFDService {
     }
 
     public Set<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
-                                           Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs) {
+                                          Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs, int dependencyKey) {
         long startTime = System.currentTimeMillis();
 
         Set<TGFD> result = new HashSet<>();
@@ -64,7 +64,6 @@ public class TGFDService {
                 int maxDistance = minMaxPair.getMax();
 
                 long numberOfPairs = MathUtil.countPairs(values);
-                // TODO: 这里并不是用numberOfDeltas, 而是matches的pair数量
                 double tgfdSupport = calculateTGFDSupport(numberOfPairs, entities.size(), config.getTimestamp());
                 if (tgfdSupport < supportThreshold) {
 //                    logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
@@ -90,7 +89,7 @@ public class TGFDService {
 //                patternService.addMinimalConstantDependency(patternNode, constantPath);
 
                 // Coordinator处，delta, support 需要重新计算
-                TGFD candidateConstantTGFD = new TGFD(minMaxPair, newDependency, 0.0, level, entities.size());
+                TGFD candidateConstantTGFD = new TGFD(minMaxPair, newDependency, 0.0, level, dependencyKey, (int) numberOfPairs);
                 result.add(candidateConstantTGFD);
             }
             long rhsDiscoveryEndTime = System.currentTimeMillis();
@@ -131,8 +130,7 @@ public class TGFDService {
         constantPath.setRhs(new ConstantLiteral(yVertexType, yAttrName, attrValue));
     }
 
-    public Set<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, double patternSupport, AttributeDependency literalPath,
-                                          List<Pair> deltas, int entitySize) {
+    public Set<TGFD> discoverGeneralTGFD(PatternTreeNode patternTreeNode, AttributeDependency literalPath, List<Pair> deltas) {
         long startTime = System.currentTimeMillis();
         Set<TGFD> tgfds = new HashSet<>();
         List<Pair> candidateDeltas = mergeOverlappingPairs(deltas);
@@ -152,7 +150,7 @@ public class TGFDService {
 
             int level = patternTreeNode.getPattern().getPattern().vertexSet().size();
 
-            TGFD tgfd = new TGFD(delta, generalDependency, 0.0, level, entitySize);
+            TGFD tgfd = new TGFD(delta, generalDependency, 0.0, level);
             tgfds.add(tgfd);
         }
 
@@ -266,7 +264,7 @@ public class TGFDService {
         return pair1.getMax() >= pair2.getMin() && pair1.getMin() <= pair2.getMax();
     }
 
-    public void processConstantTGFD(Map<Integer, Set<TGFD>> constantTGFDMap) {
+    public void processConstantTGFD(Map<Integer, Set<TGFD>> constantTGFDMap, Map<Integer,Integer> dependencyMap) {
         int numOfPositiveTGFDs = 0;
         int numOfNegativeTGFDs = 0;
 
@@ -276,9 +274,11 @@ public class TGFDService {
             Map.Entry<Integer, Set<TGFD>> entry = iterator.next();
             Set<TGFD> constantTGFDs = entry.getValue();
             Integer hashKey = entry.getKey();
+            TGFD initialTGFD = constantTGFDs.iterator().next();
+            int entities = dependencyMap.getOrDefault(initialTGFD.getDependencyKey(), 0);
 
             if (constantTGFDs.size() == 1) {
-                TGFD tgfd = updateTGFDWithSupport(constantTGFDs.iterator().next());
+                TGFD tgfd = updateTGFDWithSupport(constantTGFDs.iterator().next(), entities);
 
                 if (tgfd.getTgfdSupport() >= config.getTgfdTheta()) {
                     numOfPositiveTGFDs++;
@@ -304,9 +304,13 @@ public class TGFDService {
                         .flatMap(Set::stream)
                         .collect(Collectors.toSet());
 
-                Set<TGFD> constantTGFDResults = updateAndFilterTGFDListWithSupport(combinedSet);
+                Set<TGFD> constantTGFDResults = updateAndFilterTGFDListWithSupport(combinedSet, entities);
                 removeOverlappingDeltas(constantTGFDResults);
-                constantTGFDMap.put(hashKey, constantTGFDResults);
+                if (constantTGFDResults.isEmpty()) {
+                    iterator.remove();
+                } else {
+                    constantTGFDMap.put(hashKey, constantTGFDResults);
+                }
 
                 numOfNegativeTGFDs += constantTGFDs.size() - constantTGFDResults.size();
             }
@@ -325,12 +329,12 @@ public class TGFDService {
             Integer key = entry.getKey();
 
             Set<TGFD> combinedList = mergeAndRecreateTGFD(tgfds);
-            Set<TGFD> generalTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
+//            Set<TGFD> generalTGFDResults = updateAndFilterTGFDListWithSupport(combinedList);
 
-            count += generalTGFDResults.size();
+            count += combinedList.size();
 
-            if (generalTGFDResults.size() != 0) {
-                generalTGFDMap.put(key, generalTGFDResults);
+            if (!combinedList.isEmpty()) {
+                generalTGFDMap.put(key, combinedList);
             } else {
                 iterator.remove();
             }
@@ -356,33 +360,28 @@ public class TGFDService {
                             mergedDelta,
                             originalTGFD.getDependency(),
                             originalTGFD.getTgfdSupport(),
-                            originalTGFD.getLevel(),
-                            originalTGFD.getEntitySize()))
+                            originalTGFD.getLevel()))
                     .collect(Collectors.toSet());
         } else {
             return tgfds;
         }
     }
 
-    private TGFD updateTGFDWithSupport(TGFD tgfd) {
+    private TGFD updateTGFDWithSupport(TGFD tgfd, int entities) {
         Pair delta = tgfd.getDelta();
-        long numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
-        double tgfdSupport = calculateTGFDSupport(numberOfDeltas, tgfd.getEntitySize(), config.getTimestamp());
+//        long numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
+        double tgfdSupport = calculateTGFDSupport(tgfd.getNumberOfPairs(), entities, config.getTimestamp());
         tgfd.setTgfdSupport(tgfdSupport);
         return tgfd;
     }
 
-    private Set<TGFD> updateAndFilterTGFDListWithSupport(Set<TGFD> tgfds) {
+    private Set<TGFD> updateAndFilterTGFDListWithSupport(Set<TGFD> tgfds, int entities) {
         if (tgfds.isEmpty()) return tgfds;
-
-        int entitySize = tgfds.stream()
-                .mapToInt(TGFD::getEntitySize)
-                .sum();
 
         tgfds.forEach(tgfd -> {
             Pair delta = tgfd.getDelta();
-            long numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
-            double tgfdSupport = calculateTGFDSupport(numberOfDeltas, entitySize, config.getTimestamp());
+//            long numberOfDeltas = MathUtil.computeCombinations(delta.getMin(), delta.getMax());
+            double tgfdSupport = calculateTGFDSupport(tgfd.getNumberOfPairs(), entities, config.getTimestamp());
             tgfd.setTgfdSupport(tgfdSupport);
         });
 
@@ -406,7 +405,7 @@ public class TGFDService {
         constantTGFDResults.removeAll(toRemove);
     }
 
-    private int hashString(String input) {
+    public int hashString(String input) {
         return Hashing.murmur3_32().hashString(input, StandardCharsets.UTF_8).asInt();
     }
 

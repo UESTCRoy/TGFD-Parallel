@@ -16,7 +16,15 @@ public class TGFD implements Serializable {
     private DataDependency dependency;
     private Double tgfdSupport;
     private int level;
-    private int entitySize;
+    private int dependencyKey;
+    private int numberOfPairs;
+
+    public TGFD(Pair delta, DataDependency dependency, Double tgfdSupport, int level) {
+        this.delta = delta;
+        this.dependency = dependency;
+        this.tgfdSupport = tgfdSupport;
+        this.level = level;
+    }
 
     @Override
     public String toString() {
