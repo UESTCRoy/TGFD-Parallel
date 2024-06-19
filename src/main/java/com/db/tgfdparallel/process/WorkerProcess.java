@@ -5,11 +5,9 @@ import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
 import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.jgrapht.Graph;
-import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -29,10 +27,11 @@ public class WorkerProcess {
     private final HSpawnService hSpawnService;
     private final TGFDService tgfdService;
     private final S3Service s3Service;
+    private final AsyncService asyncService;
 
     @Autowired
     public WorkerProcess(AppConfig config, ActiveMQService activeMQService, DataShipperService dataShipperService, GraphService graphService,
-                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, S3Service s3Service) {
+                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, S3Service s3Service, AsyncService asyncService) {
         this.config = config;
         this.activeMQService = activeMQService;
         this.dataShipperService = dataShipperService;
@@ -41,6 +40,7 @@ public class WorkerProcess {
         this.hSpawnService = hSpawnService;
         this.tgfdService = tgfdService;
         this.s3Service = s3Service;
+        this.asyncService = asyncService;
     }
 
     private Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN;
@@ -128,7 +128,7 @@ public class WorkerProcess {
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
-                    CompletableFuture<Integer> future = runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+                    CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
                     futures.add(future);
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -247,46 +247,6 @@ public class WorkerProcess {
                 logger.info("Pruned pattern {} due to insufficient support.", ptn.getPattern().getPattern());
             }
         });
-    }
-
-    @Async
-    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
-                                                       Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
-                                                       Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        return CompletableFuture.completedFuture(
-                runSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap)
-        );
-    }
-
-    public int runSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader, Set<Set<ConstantLiteral>> matchesOnTimestamps, int level,
-                           Map<String, List<Integer>> entityURIs, Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
-        String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
-        level = Math.min(level, 2);
-
-        Set<String> validTypes = newPattern.getPattern().getPattern().vertexSet().stream()
-                .map(Vertex::getType)
-                .collect(Collectors.toSet());
-
-        int finalLevel = level;
-        graph.vertexSet().stream()
-                .filter(vertex -> vertex.getType().equals(centerVertexType))
-                .filter(vertex -> entityURIs.containsKey(vertex.getUri()))
-                .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
-                .forEach(centerVertex -> {
-                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, 1, validTypes);
-                    VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results =
-                            graphService.checkIsomorphism(subgraph, newPattern.getPattern(), false);
-
-                    if (results.isomorphismExists()) {
-                        Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                        patternService.extractMatches(results.getMappings(), matches, newPattern, ptnEntityURIs, snapshotID, vertexTypesToActiveAttributesMap);
-                        matchesOnTimestamps.addAll(matches);
-                    }
-                });
-        int matchesSize = matchesOnTimestamps.size();
-        logger.info("Found {} matches in snapshot {}", matchesSize, snapshotID);
-        return matchesSize;
     }
 }
 

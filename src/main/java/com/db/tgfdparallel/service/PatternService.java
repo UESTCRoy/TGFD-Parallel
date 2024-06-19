@@ -6,14 +6,12 @@ import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphMapping;
-import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -91,25 +89,24 @@ public class PatternService {
         }
     }
 
-    public int extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
-                              PatternTreeNode patternTreeNode, Map<String, List<Integer>> entityURIs, int timestamp,
-                              Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        int numOfMatches = 0;
+    public void extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
+                               PatternTreeNode patternTreeNode, Map<String, List<Integer>> entityURIs, int timestamp,
+                               Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+//        int numOfMatches = 0;
         while (iterator.hasNext()) {
             GraphMapping<Vertex, RelationshipEdge> result = iterator.next();
             Set<ConstantLiteral> literalsInMatch = new HashSet<>();
             String entityURI = extractMatch(result, patternTreeNode, literalsInMatch, vertexTypesToActiveAttributesMap);
 
             if (literalsInMatch.size() >= patternTreeNode.getPattern().getPattern().vertexSet().size()) {
-                numOfMatches++;
+//                numOfMatches++;
                 if (entityURI != null) {
-                    entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)))
-                            .set(timestamp, entityURIs.get(entityURI).get(timestamp) + 1);
+                    List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
+                    counts.set(timestamp, counts.get(timestamp) + 1);
                 }
                 matches.add(literalsInMatch);
             }
         }
-        return numOfMatches;
     }
 
     public String extractMatch(GraphMapping<Vertex, RelationshipEdge> result, PatternTreeNode patternTreeNode,

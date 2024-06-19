@@ -1,128 +1,72 @@
 package com.db.tgfdparallel.service;
 
-import com.db.tgfdparallel.config.AppConfig;
+import com.db.tgfdparallel.domain.*;
+import org.jgrapht.Graph;
+import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Service
 @EnableAsync
 public class AsyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncService.class);
-    private final AppConfig config;
-    private final ActiveMQService activeMQService;
-    private long ThreadIdealTime = 3000;
+    private final GraphService graphService;
+    private final PatternService patternService;
 
     @Autowired
-    public AsyncService(AppConfig config, ActiveMQService activeMQService) {
-        this.config = config;
-        this.activeMQService = activeMQService;
+    public AsyncService(GraphService graphService, PatternService patternService) {
+        this.graphService = graphService;
+        this.patternService = patternService;
     }
 
-    public CompletableFuture<Void> changeShipper(Map<Integer, String> changesToBeSentToAllWorkers,AtomicInteger superstep, AtomicBoolean resultsGetterDone) {
-        return CompletableFuture.runAsync(() -> {
-            System.out.println("*DATA SHIPPER*: Edges are received to be shipped to the workers");
-            try {
-                while (true) {
-                    int currentSuperstep = superstep.get();
-                    while (!changesToBeSentToAllWorkers.containsKey(currentSuperstep)) {
-                        Thread.sleep(ThreadIdealTime);
-                        currentSuperstep = superstep.get();
-                    }
-
-                    // Wait for the ResultsGetter to update the superstep
-                    while (!resultsGetterDone.get()) {
-                        Thread.sleep(ThreadIdealTime);
-                    }
-                    resultsGetterDone.set(false);
-
-                    activeMQService.connectProducer();
-                    StringBuilder message;
-
-                    if (changesToBeSentToAllWorkers.containsKey(currentSuperstep)) {
-                        message = new StringBuilder();
-                        message.append("#change").append("\n").append(changesToBeSentToAllWorkers.get(currentSuperstep));
-                        for (String worker : config.getWorkers()) {
-                            activeMQService.send(worker, message.toString());
-                            System.out.println("*DataShipper*: Change objects have been shared with '" + worker + "' successfully");
-                        }
-                    }
-                    System.out.println("*DataShipper*: All files are shared for the superstep: " + currentSuperstep);
-                    changesToBeSentToAllWorkers.remove(currentSuperstep);
-                    if (currentSuperstep == config.getTimestamp()) {
-                        break;
-                    }
-                }
-                System.out.println("*DataShipper*: All changes are shipped to the workers.");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
+    @Async
+    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
+                                                       Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
+                                                       Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+        logger.info("Starting async task for snapshot {}", snapshotID);
+        Integer result = runSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+        logger.info("Completed async task for snapshot {}, result: {}", snapshotID, result);
+        return CompletableFuture.completedFuture(result);
     }
 
-//    public CompletableFuture<Void> resultsGetter(AtomicInteger superstep, AtomicBoolean resultsGetterDone) {
-//        return CompletableFuture.runAsync(() -> {
-//            System.out.println("*RESULTS GETTER*: Coordinator listens to get the results back from the workers");
-//            for (String worker_name : workersStatus.keySet()) {
-//                if (!results.containsKey(worker_name))
-//                    results.put(worker_name, new ArrayList<>());
-//            }
-//            try {
-//                while (true) {
-//                    activeMQService.connectConsumer("results" + superstep.get());
-//
-//                    System.out.println("*RESULTS GETTER*: Listening for new messages to get the results " + superstep.get());
-//                    String msg = activeMQService.receive();
-//                    System.out.println("*RESULTS GETTER*: Received a new message.");
-//                    if (msg != null) {
-//                        String[] temp = msg.split("@");
-//                        if (temp.length == 2) {
-//                            String worker_name = temp[0].toLowerCase();
-//                            if (workersStatus.containsKey(worker_name)) {
-//                                System.out.println("*RESULTS GETTER*: Results received from: '" + worker_name + "'");
-//                                results.get(worker_name).add(temp[1]);
-//                            } else {
-//                                System.out.println("*RESULTS GETTER*: Unable to find the worker name: '" + worker_name + "' in workers list. " +
-//                                        "Please update the list in the Config file.");
-//                            }
-//                        } else {
-//                            System.out.println("*RESULTS GETTER*: Message corrupted: " + msg);
-//                        }
-//                    } else
-//                        System.out.println("*RESULTS GETTER*: Error happened. message is null");
-//
-//                    boolean done = true;
-//                    for (String worker_name : workersStatus.keySet()) {
-//                        if (results.get(worker_name).size() != superstep.get()) {
-//                            done = false;
-//                            break;
-//                        }
-//                    }
-//                    if (done) {
-//                        superstep.set(superstep.get() + 1);
-//                        resultsGetterDone.set(true); // Set the resultsGetterDone to true when superstep is updated
-//                        if (superstep.get() > config.getTimestamp()) {
-//                            System.out.println("*RESULTS GETTER*: All done! No superstep remained.");
-//                            allDone.set(true);
-//                            activeMQService.closeConsumer();
-//                            break;
-//                        }
-//                        System.out.println("*RESULTS GETTER*: Starting the new superstep! -> " + superstep.get());
-//                    }
-//                    activeMQService.closeConsumer();
-//                }
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//        });
-//    }
+    public int runSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader, Set<Set<ConstantLiteral>> matchesOnTimestamps, int level,
+                           Map<String, List<Integer>> entityURIs, Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+        Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
+        String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
+        level = Math.min(level, 2);
 
+        Set<String> validTypes = newPattern.getPattern().getPattern().vertexSet().stream()
+                .map(Vertex::getType)
+                .collect(Collectors.toSet());
+
+        int finalLevel = level;
+        graph.vertexSet().stream()
+                .filter(vertex -> vertex.getType().equals(centerVertexType))
+                .filter(vertex -> entityURIs.containsKey(vertex.getUri()))
+                .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
+                .forEach(centerVertex -> {
+                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, 1, validTypes);
+                    VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results =
+                            graphService.checkIsomorphism(subgraph, newPattern.getPattern(), false);
+
+                    if (results.isomorphismExists()) {
+                        Set<Set<ConstantLiteral>> matches = new HashSet<>();
+                        patternService.extractMatches(results.getMappings(), matches, newPattern, ptnEntityURIs, snapshotID, vertexTypesToActiveAttributesMap);
+                        matchesOnTimestamps.addAll(matches);
+                    }
+                });
+        return matchesOnTimestamps.size();
+    }
 }
