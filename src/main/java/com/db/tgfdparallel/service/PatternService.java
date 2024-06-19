@@ -92,7 +92,8 @@ public class PatternService {
     }
 
     public int extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
-                                  PatternTreeNode patternTreeNode, int timestamp, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+                              PatternTreeNode patternTreeNode, Map<String, List<Integer>> entityURIs, int timestamp,
+                              Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         int numOfMatches = 0;
         while (iterator.hasNext()) {
             GraphMapping<Vertex, RelationshipEdge> result = iterator.next();
@@ -101,6 +102,10 @@ public class PatternService {
 
             if (literalsInMatch.size() >= patternTreeNode.getPattern().getPattern().vertexSet().size()) {
                 numOfMatches++;
+                if (entityURI != null) {
+                    entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)))
+                            .set(timestamp, entityURIs.get(entityURI).get(timestamp) + 1);
+                }
                 matches.add(literalsInMatch);
             }
         }

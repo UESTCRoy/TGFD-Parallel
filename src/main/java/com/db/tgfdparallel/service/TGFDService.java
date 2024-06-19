@@ -44,6 +44,10 @@ public class TGFDService {
 
             long rhsDiscoveryStartTime = System.currentTimeMillis();
             // 不管rhsAttrValuesTimestampsSortedByFreq的size，也计算Delta，对每个都转成TGFD，然后support返回给Coordinator处理
+
+            Set<String> attrValues = xLiterals.stream()
+                    .map(ConstantLiteral::getAttrValue).collect(Collectors.toSet());
+
             // TODO: Deal with multiple rhs
             for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
                 VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(pattern);
@@ -54,10 +58,31 @@ public class TGFDService {
                 String yAttrValue = entry.getKey().getAttrValue();
                 generateDataDependency(yAttrValue, yLiteral, newPattern, newDependency, constantPath, xLiterals);
 
+                attrValues.add(yAttrValue);
+                boolean foundAmamiya = false;
+                boolean foundBach = false;
+
+                if (level > 2) {
+                    for (String value : attrValues) {
+                        if (value.equalsIgnoreCase("amamiya, michiko")) {
+                            logger.info("Found Amamiya, Michiko");
+                            foundAmamiya = true;
+                        }
+                        if (value.equalsIgnoreCase("bach, marisa leonie")) {
+                            logger.info("Found Bach, Marisa Leonie");
+                            foundBach = true;
+                        }
+                        if (foundAmamiya || foundBach) break;
+                    }
+                }
+
                 // 处理Delta
                 List<Integer> values = entry.getValue();
                 Pair minMaxPair = getMinMaxPair(values);
                 if (minMaxPair == null) {
+                    if (foundAmamiya || foundBach) {
+                        logger.info("Min Max Pair is null, Marisa Leonie");
+                    }
                     continue;
                 }
                 int minDistance = minMaxPair.getMin();
@@ -66,6 +91,9 @@ public class TGFDService {
                 long numberOfPairs = MathUtil.countPairs(values);
                 double tgfdSupport = calculateTGFDSupport(numberOfPairs, entities.size(), config.getTimestamp());
                 if (tgfdSupport < supportThreshold) {
+                    if (foundAmamiya || foundBach) {
+                        logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
+                    }
 //                    logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
                     continue;
                 }
@@ -89,6 +117,9 @@ public class TGFDService {
 //                patternService.addMinimalConstantDependency(patternNode, constantPath);
 
                 // Coordinator处，delta, support 需要重新计算
+                if (foundAmamiya || foundBach) {
+                    logger.info("Add Amamiya or Bach, Marisa Leonie to TGFDs");
+                }
                 TGFD candidateConstantTGFD = new TGFD(minMaxPair, newDependency, 0.0, level, dependencyKey, (int) numberOfPairs);
                 result.add(candidateConstantTGFD);
             }
@@ -310,9 +341,11 @@ public class TGFDService {
                     iterator.remove();
                 } else {
                     constantTGFDMap.put(hashKey, constantTGFDResults);
+                    logger.info("There are {} TGFDs for key {}", constantTGFDResults.size(), hashKey);
                 }
 
                 numOfNegativeTGFDs += constantTGFDs.size() - constantTGFDResults.size();
+                numOfPositiveTGFDs += constantTGFDResults.size();
             }
         }
 

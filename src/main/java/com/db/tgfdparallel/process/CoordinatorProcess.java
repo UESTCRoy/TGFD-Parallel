@@ -90,8 +90,8 @@ public class CoordinatorProcess {
         Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
 
         // Send the edge data to the workers
-        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, edgesToBeShipped, fragmentsForTheInitialLoad);
-        dataShipperService.edgeShipper(listOfFiles);
+//        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, edgesToBeShipped, fragmentsForTheInitialLoad);
+//        dataShipperService.edgeShipper(listOfFiles);
 
         // Generate all the changes for histogram computation and send to all workers
         List<List<Change>> changesData = changeService.changeGenerator(changeFilePath, config.getTimestamp());
@@ -104,8 +104,10 @@ public class CoordinatorProcess {
             sb.append("\n").append(changeFileName);
         }
         for (String worker : config.getWorkers()) {
+            activeMQService.connectProducer();
             activeMQService.send(worker, sb.toString());
             logger.info("Change objects have been shared with '" + worker + "' successfully");
+            activeMQService.closeProducer();
         }
 
         Map<Integer, Integer> dependencyMap = dataShipperService.downloadDependencyMap("dependency");

@@ -41,11 +41,11 @@ public class FileUtil {
     public static void saveConstantTGFDsToFile(Map<Integer, Set<TGFD>> data, String filename) {
         try (PrintWriter out = new PrintWriter(new FileWriter(filename))) {
             for (Map.Entry<Integer, Set<TGFD>> entry : data.entrySet()) {
-                out.println("Value: ");
+//                out.println("Value: ");
                 for (TGFD tgfd : entry.getValue()) {
                     out.println(tgfd.toString());
                 }
-                out.println();
+//                out.println();
             }
         } catch (IOException e) {
             System.out.println("An error occurred while writing to file: " + e.getMessage());

@@ -121,18 +121,20 @@ public class WorkerProcess {
 //                }
                 String centerVertexType = newPattern.getPattern().getCenterVertexType();
                 Map<String, List<Integer>> entityURIs = entityURIsByPTN.get(centerVertexType);
+                // For Support Computing
+                Map<String, List<Integer>> ptnEntityURIs = new HashMap<>();
 
                 List<CompletableFuture<Integer>> futures = new ArrayList<>();
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
-                    CompletableFuture<Integer> future = runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, vertexTypesToActiveAttributesMap);
+                    CompletableFuture<Integer> future = runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
                     futures.add(future);
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
-                double newPatternSupport = patternService.calculatePatternSupport(entityURIs,
+                double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
                         vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
                 logger.info("The pattern support for pattern: {} is {}", pattern, newPatternSupport);
                 newPattern.setPatternSupport(newPatternSupport);
@@ -250,14 +252,14 @@ public class WorkerProcess {
     @Async
     public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
                                                        Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
-                                                       Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+                                                       Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         return CompletableFuture.completedFuture(
-                runSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, vertexTypesToActiveAttributesMap)
+                runSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap)
         );
     }
 
     public int runSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader, Set<Set<ConstantLiteral>> matchesOnTimestamps, int level,
-                           Map<String, List<Integer>> entityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+                           Map<String, List<Integer>> entityURIs, Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
         level = Math.min(level, 2);
@@ -278,7 +280,7 @@ public class WorkerProcess {
 
                     if (results.isomorphismExists()) {
                         Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                        patternService.extractMatches(results.getMappings(), matches, newPattern, snapshotID, vertexTypesToActiveAttributesMap);
+                        patternService.extractMatches(results.getMappings(), matches, newPattern, ptnEntityURIs, snapshotID, vertexTypesToActiveAttributesMap);
                         matchesOnTimestamps.addAll(matches);
                     }
                 });
