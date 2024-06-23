@@ -311,7 +311,6 @@ public class TGFDService {
                     iterator.remove();
                 } else {
                     constantTGFDMap.put(hashKey, constantTGFDResults);
-                    logger.info("There are {} TGFDs for key {}", constantTGFDResults.size(), hashKey);
                 }
 
                 numOfNegativeTGFDs += constantTGFDs.size() - constantTGFDResults.size();

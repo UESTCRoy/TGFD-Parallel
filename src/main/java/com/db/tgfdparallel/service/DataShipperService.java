@@ -329,7 +329,7 @@ public class DataShipperService {
         activeMQService.send("dependency-tgfd", dependencyKey);
         activeMQService.send("constant-tgfd", constantKey);
         activeMQService.send("general-tgfd", generalKey);
-        logger.info("Worker " + config.getNodeName() + "send TGFDs back to coordinator successfully!");
+        logger.info("Worker " + config.getNodeName() + " send TGFDs back to coordinator successfully!");
         activeMQService.closeProducer();
     }
 

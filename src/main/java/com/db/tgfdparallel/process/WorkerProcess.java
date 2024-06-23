@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -122,7 +123,7 @@ public class WorkerProcess {
                 String centerVertexType = newPattern.getPattern().getCenterVertexType();
                 Map<String, List<Integer>> entityURIs = entityURIsByPTN.get(centerVertexType);
                 // For Support Computing
-                Map<String, List<Integer>> ptnEntityURIs = new HashMap<>();
+                Map<String, List<Integer>> ptnEntityURIs = new ConcurrentHashMap<>();
 
                 List<CompletableFuture<Integer>> futures = new ArrayList<>();
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
@@ -160,23 +161,13 @@ public class WorkerProcess {
         logger.info("======================================");
 
         // 生成constant与general的TGFD Map，返回给Coordinator汇总
-        int constantCounter = 0;
         for (TGFD data : constantTGFDs) {
             int hashKey = tgfdService.getConstantTGFDKey(data.getDependency());
             constantTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>()).add(data);
-            constantCounter++;
-//            if (constantCounter == 50000) {
-//                break;
-//            }
         }
-        int generalCounter = 0;
         for (TGFD data : generalTGFDs) {
             int hashKey = tgfdService.getGeneralTGFDKey(data.getDependency());
             generalTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>()).add(data);
-            generalCounter++;
-//            if (generalCounter == 50000) {
-//                break;
-//            }
         }
 
         // Send data(Constant TGFDs) back to coordinator

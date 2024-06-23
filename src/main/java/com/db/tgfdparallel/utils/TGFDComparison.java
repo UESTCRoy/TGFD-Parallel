@@ -20,8 +20,8 @@ public class TGFDComparison {
     private static final Pattern literalPattern = Pattern.compile("ConstantLiteral\\{vertexType='(.*?)', attrName='(.*?)', attrValue='(.*?)'\\}");
 
     public static void main(String[] args) throws IOException {
-        String path1 = "/Users/roy/Desktop/TGFD/Constant-TGFD2.txt";
-        String path2 = "/Users/roy/Desktop/TGFD/experiment-tgfdsG300k_imdb-t16-k2-theta8.0E-5-gamma20-freqSet10-fast-changefileAll-2024.06.17.10.17.21.txt";
+        String path1 = "/Users/roy/Desktop/TGFD/datasets/imdb/Constant-TGFD.txt";
+        String path2 = "/Users/roy/Desktop/TGFD/datasets/imdb/experiment-tgfdsG1m_imdb-t16-k2-theta8.0E-5-gamma20-freqSet10-fast-changefileAll-2024.06.20.13.26.20.txt";
 
         Set<TGFD> tgfdSet1 = new HashSet<>();
         Set<TGFD> tgfdSet2 = new HashSet<>();

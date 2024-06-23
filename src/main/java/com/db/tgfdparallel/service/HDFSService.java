@@ -29,27 +29,38 @@ public class HDFSService {
     }
 
     public void uploadObject(String directoryName, String fileName, Object obj) {
+        FileSystem fs = null;
         try {
             byte[] data = serializeObject(obj);
             ByteArrayInputStream inputStream = new ByteArrayInputStream(data);
 
-            FileSystem fs = FileSystem.get(conf);
+            fs = FileSystem.get(conf);
 
             Path directoryPath = new Path(directoryName);
             if (!fs.exists(directoryPath)) {
                 fs.mkdirs(directoryPath);
+                logger.info("Created directory: {}", directoryPath);
             }
 
             Path filePath = new Path(directoryPath, fileName);
-            try (FSDataOutputStream out = fs.create(filePath)) {
+            try (FSDataOutputStream out = fs.create(filePath, true)) {
                 byte[] buffer = new byte[1024];
                 int bytesRead;
                 while ((bytesRead = inputStream.read(buffer)) > 0) {
                     out.write(buffer, 0, bytesRead);
                 }
+                logger.info("Successfully uploaded to {}", filePath);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Failed to upload object to {}/{} due to {}", directoryName, fileName, e.getMessage(), e);
+        } finally {
+            if (fs != null) {
+                try {
+                    fs.close();
+                } catch (IOException e) {
+                    logger.error("Failed to close FileSystem object", e);
+                }
+            }
         }
     }
 
