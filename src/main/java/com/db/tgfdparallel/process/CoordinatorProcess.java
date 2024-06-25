@@ -85,9 +85,9 @@ public class CoordinatorProcess {
         Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
 
         // Define jobs and assign them to the workers
-        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(firstGraphPath, vertexTypes).getGraph().getGraph();
-        logger.info("The result of optimized first snapshot graph has {} vertices and {} edges", firstGraph.vertexSet().size(), firstGraph.edgeSet().size());
-        Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
+//        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(firstGraphPath, vertexTypes).getGraph().getGraph();
+//        logger.info("The result of optimized first snapshot graph has {} vertices and {} edges", firstGraph.vertexSet().size(), firstGraph.edgeSet().size());
+//        Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
 
         // Send the edge data to the workers
 //        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, edgesToBeShipped, fragmentsForTheInitialLoad);

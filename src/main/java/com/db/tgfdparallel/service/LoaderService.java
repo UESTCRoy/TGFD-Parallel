@@ -229,7 +229,7 @@ public class LoaderService {
         String uniqueId = id + "-" + type;
 
         return nodeMap.computeIfAbsent(uniqueId, key -> {
-            Vertex newVertex = new Vertex(id, type);
+            Vertex newVertex = new Vertex(uniqueId, type);
             dataGraph.addVertex(newVertex);
             return newVertex;
         });

@@ -2,7 +2,6 @@ package com.db.tgfdparallel.service;
 
 import com.db.tgfdparallel.domain.*;
 import org.jgrapht.Graph;
-import org.jgrapht.GraphMapping;
 import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,8 +50,6 @@ public class AsyncService {
                 .map(Vertex::getType)
                 .collect(Collectors.toSet());
 
-        List<Iterator<GraphMapping<Vertex, RelationshipEdge>>> allMappings = new ArrayList<>();
-
         graph.vertexSet().stream()
                 .filter(vertex -> vertex.getType().equals(centerVertexType))
                 .filter(vertex -> entityURIs.containsKey(vertex.getUri()))
@@ -69,35 +66,19 @@ public class AsyncService {
                     }
 
                     if (results.isomorphismExists()) {
-                        allMappings.add(results.getMappings());
                         Set<Set<ConstantLiteral>> matches = new HashSet<>();
                         long extractMatchesStartTime = System.currentTimeMillis();
                         patternService.extractMatches(results.getMappings(), matches, newPattern, ptnEntityURIs, snapshotID, vertexTypesToActiveAttributesMap);
                         long extractMatchesEndTime = System.currentTimeMillis();
                         long extractDuration = extractMatchesEndTime - extractMatchesStartTime;
                         if (extractDuration > 10000) {
-                            logger.info("Extracting matches for snapshot {} took {} ms", snapshotID, extractMatchesEndTime - extractMatchesStartTime);
-                            logger.info("Matches: {}", matches.size());
-                            long currentMappingCount = countMappings(results.getMappings());
-                            logger.info("Mappings: {}", currentMappingCount);
+                            logger.info("Snapshot {}: Extraction took {} ms, Matches: {}", snapshotID, extractDuration, matches.size());
                         }
 
                         matchesOnTimestamps.addAll(matches);
                     }
                 });
 
-        long totalMappings = allMappings.stream().mapToLong(this::countMappings).sum();
-        logger.info("Total number of isomorphisms for all snapshots: {}", totalMappings);
-
         return matchesOnTimestamps.size();
-    }
-
-    private long countMappings(Iterator<GraphMapping<Vertex, RelationshipEdge>> mappings) {
-        long count = 0;
-        while (mappings.hasNext()) {
-            mappings.next();
-            count++;
-        }
-        return count;
     }
 }
