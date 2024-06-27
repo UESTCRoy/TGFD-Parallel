@@ -21,27 +21,31 @@ public class AsyncService {
     private static final Logger logger = LoggerFactory.getLogger(AsyncService.class);
     private final GraphService graphService;
     private final PatternService patternService;
+    private final TGFDService tgfdService;
+    private final DependencyService dependencyService;
 
     @Autowired
-    public AsyncService(GraphService graphService, PatternService patternService) {
+    public AsyncService(GraphService graphService, PatternService patternService, TGFDService tgfdService, DependencyService dependencyService) {
         this.graphService = graphService;
         this.patternService = patternService;
+        this.tgfdService = tgfdService;
+        this.dependencyService = dependencyService;
     }
 
     @Async
     public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
                                                        Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
                                                        Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        logger.info("Starting async task for snapshot {}", snapshotID);
+        long startTime = System.currentTimeMillis();
         Integer result = runSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
-        logger.info("Completed async task for snapshot {}, result: {}", snapshotID, result);
+        long endTime = System.currentTimeMillis();
+        logger.info("Async task for snapshot {} started and completed in {} ms, result: {}", snapshotID, (endTime - startTime), result);
         return CompletableFuture.completedFuture(result);
     }
 
     public int runSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
-                           Set<Set<ConstantLiteral>> matchesOnTimestamps, int level,
-                           Map<String, List<Integer>> entityURIs, Map<String, List<Integer>> ptnEntityURIs,
-                           Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+                           Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
+                           Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
         level = Math.min(level, 2);
@@ -55,7 +59,13 @@ public class AsyncService {
                 .filter(vertex -> entityURIs.containsKey(vertex.getUri()))
                 .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
+                    long subGraphStartTime = System.currentTimeMillis();
                     Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, 1, validTypes);
+                    long subGraphEndTime = System.currentTimeMillis();
+                    long subGraphDuration = subGraphEndTime - subGraphStartTime;
+                    if (subGraphDuration > 10000) {
+                        logger.info("Subgraph creation for snapshot {} took {} ms", snapshotID, subGraphDuration);
+                    }
 
                     long isomorphismStartTime = System.currentTimeMillis();
                     VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, newPattern.getPattern(), false);
@@ -80,5 +90,39 @@ public class AsyncService {
                 });
 
         return matchesOnTimestamps.size();
+    }
+
+    @Async
+    public CompletableFuture<List<List<TGFD>>> findTGFDsAsync(PatternTreeNode patternTreeNode, AttributeDependency newPath,
+                                                              List<Set<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
+        long startTime = System.currentTimeMillis();
+        List<List<TGFD>> result = findTGFDs(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap);
+        long endTime = System.currentTimeMillis();
+        logger.info("Async task for finding TGFDs for dependency {} completed in {} ms", newPath, (endTime - startTime));
+        return CompletableFuture.completedFuture(result);
+    }
+
+    public List<List<TGFD>> findTGFDs(PatternTreeNode patternTreeNode, AttributeDependency newPath, List<Set<Set<ConstantLiteral>>> matchesPerTimestamps,
+                                      Map<Integer, Integer> dependencyNumberMap) {
+        List<List<TGFD>> result = new ArrayList<>();
+        result.add(new ArrayList<>());
+        result.add(new ArrayList<>());
+
+        Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = dependencyService.findEntities(newPath, matchesPerTimestamps);
+        List<Pair> candidatePairs = new ArrayList<>();
+
+        int dependencyKey = tgfdService.generateDependencyKey(newPath);
+        dependencyNumberMap.put(dependencyKey, entities.size());
+
+        Set<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs, dependencyKey);
+        logger.info("There are {} constant TGFDs discovered for dependency {}", constantTGFD.size(), newPath);
+        result.get(0).addAll(constantTGFD);
+
+        if (!candidatePairs.isEmpty()) {
+            Set<TGFD> generalTGFD = tgfdService.discoverGeneralTGFD(patternTreeNode, newPath, candidatePairs);
+            result.get(1).addAll(generalTGFD);
+        }
+
+        return result;
     }
 }

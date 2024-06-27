@@ -112,14 +112,8 @@ public class WorkerProcess {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
                 List<Set<Set<ConstantLiteral>>> matchesPerTimestamps = new ArrayList<>(Collections.nCopies(config.getTimestamp(), new HashSet<>()));
-
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
-//                if (level == 1 && numOfNewJobs < 100 * config.getTimestamp()) {
-//                    logger.info("The number of new jobs is too small, skip this pattern");
-//                    newPattern.setPruned(true);
-//                    continue;
-//                }
                 String centerVertexType = newPattern.getPattern().getCenterVertexType();
                 Map<String, List<Integer>> entityURIs = entityURIsByPTN.get(centerVertexType);
                 // For Support Computing
@@ -147,13 +141,17 @@ public class WorkerProcess {
                 matchesPerTimestampsByPTN.put(newPattern, matchesPerTimestamps);
 
                 // 计算新pattern的HSpawn
-                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps, dependencyNumberMap);
+                CompletableFuture<List<List<TGFD>>> futureTGFDs = hSpawnService.performHSPawn(
+                        vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps, dependencyNumberMap);
+                List<List<TGFD>> tgfds = futureTGFDs.join();
+
                 if (tgfds.size() == 2 && level > 1) {
                     constantTGFDs.addAll(tgfds.get(0));
                     generalTGFDs.addAll(tgfds.get(1));
+
+                    logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
+                            level, newPattern.getPattern().getPattern(), tgfds.get(0).size(), tgfds.get(1).size());
                 }
-                logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
-                        level, newPattern.getPattern().getPattern(), constantTGFDs.size(), generalTGFDs.size());
             }
         }
         logger.info("======================================");

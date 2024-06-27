@@ -385,9 +385,7 @@ public class GraphService {
                         visited.put(adjacent, currentDistance + 1);
                         queue.add(adjacent);
                         subgraph.addVertex(adjacent);
-
                         subgraph.addEdge(edge.getSource(), edge.getTarget(), edge);
-
                     }
                 });
             }

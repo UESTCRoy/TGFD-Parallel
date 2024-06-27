@@ -47,13 +47,13 @@ public class TGFDService {
 
             // TODO: Deal with multiple rhs
             for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
-                VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(pattern);
+//                VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(pattern);
                 DataDependency newDependency = new DataDependency();
                 AttributeDependency constantPath = new AttributeDependency();
 
                 // 处理Dependency
                 String yAttrValue = entry.getKey().getAttrValue();
-                generateDataDependency(yAttrValue, yLiteral, newPattern, newDependency, constantPath, xLiterals);
+                generateDataDependency(yAttrValue, yLiteral, pattern, newDependency, constantPath, xLiterals);
 
                 // 处理Delta
                 List<Integer> values = entry.getValue();
@@ -114,14 +114,14 @@ public class TGFDService {
         for (Vertex v : newPattern.getPattern().vertexSet()) {
             String vType = v.getType();
             if (vType.equalsIgnoreCase(yVertexType)) {
-                v.getAttributes().add(new Attribute(yAttrName));
+//                v.getAttributes().add(new Attribute(yAttrName));
                 ConstantLiteral newY = new ConstantLiteral(yVertexType, yAttrName, attrValue);
                 newDependency.getY().add(newY);
             }
 
             ConstantLiteral xLiteral = vertexTypeToLiteral.get(vType);
             if (xLiteral != null) {
-                v.getAttributes().add(new Attribute(xLiteral.getAttrName(), xLiteral.getAttrValue()));
+//                v.getAttributes().add(new Attribute(xLiteral.getAttrName(), xLiteral.getAttrValue()));
                 ConstantLiteral newXLiteral = new ConstantLiteral(vType, xLiteral.getAttrName(), xLiteral.getAttrValue());
                 newDependency.getX().add(newXLiteral);
                 constantPath.getLhs().add(newXLiteral);
@@ -157,6 +157,7 @@ public class TGFDService {
 
         if (!tgfds.isEmpty() && literalPath.getLhs().size() > 1) {
             patternService.addMinimalDependency(patternTreeNode, literalPath);
+            logger.info("Added minimal dependency: {}", literalPath);
         }
         long endTime = System.currentTimeMillis();
         logger.info("Time taken to discover general TGFDs: {} ms on {}, and there are {} general TGFD", (endTime - startTime), literalPath, tgfds.size());
@@ -405,6 +406,15 @@ public class TGFDService {
             }
         }
         constantTGFDResults.removeAll(toRemove);
+    }
+
+    public int generateDependencyKey(AttributeDependency dependency) {
+        StringBuilder key = new StringBuilder();
+        for (ConstantLiteral literal : dependency.getLhs()) {
+            key.append(literal.getVertexType()).append(literal.getAttrName());
+        }
+        key.append(dependency.getRhs().getVertexType()).append(dependency.getRhs().getAttrName());
+        return hashString(key.toString());
     }
 
     public int hashString(String input) {

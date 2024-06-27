@@ -49,7 +49,7 @@ public class CoordinatorProcess {
 
         // Graph Path
         String firstGraphPath = config.getFirstGraphPath();
-        List<String> splitGraphPath = config.getSplitGraphPath();
+//        List<String> splitGraphPath = config.getSplitGraphPath();
         String changeFilePath = config.getChangeFilePath();
         // AWS Data Preparation
         if (dataShipperService.isAmazonMode()) {
@@ -82,7 +82,7 @@ public class CoordinatorProcess {
         activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
 
         // Initialize the graph from the split graph, String (VertexURI) -> Integer (FragmentID)
-        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
+//        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
 
         // Define jobs and assign them to the workers
 //        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(firstGraphPath, vertexTypes).getGraph().getGraph();

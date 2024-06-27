@@ -280,7 +280,6 @@ public class PatternService {
         return false;
     }
 
-
     private Vertex isDuplicateVertex(VF2PatternGraph newPattern, String vertexType) {
         return newPattern.getPattern().vertexSet().stream()
                 .filter(v -> v.getType().equals(vertexType))
