@@ -45,11 +45,12 @@ public class CoordinatorProcess {
     }
 
     public void start() {
+        long startTime = System.currentTimeMillis();
         initializeWorkers();
 
         // Graph Path
         String firstGraphPath = config.getFirstGraphPath();
-        List<String> splitGraphPath = config.getSplitGraphPath();
+//        List<String> splitGraphPath = config.getSplitGraphPath();
         String changeFilePath = config.getChangeFilePath();
         // AWS Data Preparation
         if (dataShipperService.isAmazonMode()) {
@@ -82,16 +83,16 @@ public class CoordinatorProcess {
         activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
 
         // Initialize the graph from the split graph, String (VertexURI) -> Integer (FragmentID)
-        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
+//        Map<String, Integer> fragmentsForTheInitialLoad = graphService.initializeFromSplitGraph(splitGraphPath, vertexTypes);
 
         // Define jobs and assign them to the workers
-        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(firstGraphPath, vertexTypes).getGraph().getGraph();
-        logger.info("The result of optimized first snapshot graph has {} vertices and {} edges", firstGraph.vertexSet().size(), firstGraph.edgeSet().size());
-        Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
+//        Graph<Vertex, RelationshipEdge> firstGraph = graphService.loadFirstSnapshot(firstGraphPath, vertexTypes).getGraph().getGraph();
+//        logger.info("The result of optimized first snapshot graph has {} vertices and {} edges", firstGraph.vertexSet().size(), firstGraph.edgeSet().size());
+//        Map<Integer, List<RelationshipEdge>> edgesToBeShipped = jobService.defineEdgesToBeShipped(firstGraph, fragmentsForTheInitialLoad, patternTreeNodes);
 
         // Send the edge data to the workers
-        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, edgesToBeShipped, fragmentsForTheInitialLoad);
-        dataShipperService.edgeShipper(listOfFiles);
+//        Map<Integer, List<String>> listOfFiles = dataShipperService.dataToBeShippedAndSend(800000, edgesToBeShipped, fragmentsForTheInitialLoad);
+//        dataShipperService.edgeShipper(listOfFiles);
 
         // Generate all the changes for histogram computation and send to all workers
         List<List<Change>> changesData = changeService.changeGenerator(changeFilePath, config.getTimestamp());
@@ -104,16 +105,20 @@ public class CoordinatorProcess {
             sb.append("\n").append(changeFileName);
         }
         for (String worker : config.getWorkers()) {
+            activeMQService.connectProducer();
             activeMQService.send(worker, sb.toString());
             logger.info("Change objects have been shared with '" + worker + "' successfully");
+            activeMQService.closeProducer();
         }
 
+        Map<Integer, Integer> dependencyMap = dataShipperService.downloadDependencyMap("dependency");
+
         // 处理Constant TGFD
-        Map<Integer, List<TGFD>> constantTGFDMap = dataShipperService.downloadConstantTGFD("constant");
-        tgfdService.processConstantTGFD(constantTGFDMap);
+        Map<Integer, Set<TGFD>> constantTGFDMap = dataShipperService.downloadConstantTGFD("constant");
+        tgfdService.processConstantTGFD(constantTGFDMap, dependencyMap);
 
         // 处理General TGFD
-        Map<Integer, List<TGFD>> generalTGFDMap = dataShipperService.downloadConstantTGFD("general");
+        Map<Integer, Set<TGFD>> generalTGFDMap = dataShipperService.downloadConstantTGFD("general");
         tgfdService.processGeneralTGFD(generalTGFDMap);
 
         FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
@@ -124,6 +129,13 @@ public class CoordinatorProcess {
 //        if (dataShipperService.isAmazonMode()) {
 //
 //        }
+
+        long endTime = System.currentTimeMillis();
+        long durationMillis = endTime - startTime;
+        long hours = durationMillis / 3600000; // 3600000 毫秒/小时
+        long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
+        long seconds = ((durationMillis % 3600000) % 60000) / 1000;
+        logger.info("The coordinator process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
     }
 
     private void initializeWorkers() {

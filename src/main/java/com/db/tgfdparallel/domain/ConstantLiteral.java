@@ -28,4 +28,13 @@ public class ConstantLiteral extends Literal implements Comparable<ConstantLiter
 
         return this.attrValue.compareTo(other.attrValue);
     }
+
+    @Override
+    public String toString() {
+        return "ConstantLiteral{" +
+                "vertexType='" + vertexType + '\'' +
+                ", attrName='" + attrName + '\'' +
+                ", attrValue='" + attrValue + '\'' +
+                '}';
+    }
 }

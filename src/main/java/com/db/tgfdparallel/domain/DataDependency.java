@@ -1,12 +1,14 @@
 package com.db.tgfdparallel.domain;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 @Data
+@EqualsAndHashCode
 public class DataDependency implements Serializable {
     private List<Literal> x;
     private List<Literal> y;
@@ -16,8 +18,11 @@ public class DataDependency implements Serializable {
         this.y = new ArrayList<>();
     }
 
-    public DataDependency(List<Literal> x, List<Literal> y) {
-        this.x = x;
-        this.y = y;
+    @Override
+    public String toString() {
+        return "DataDependency{" +
+                "x=" + x +
+                ", y=" + y +
+                '}';
     }
 }

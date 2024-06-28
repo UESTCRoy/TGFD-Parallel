@@ -6,14 +6,12 @@ import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphMapping;
-import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -91,33 +89,35 @@ public class PatternService {
         }
     }
 
-    public int extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
-                                  PatternTreeNode patternTreeNode, int timestamp, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        int numOfMatches = 0;
+    public void extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
+                               PatternTreeNode patternTreeNode, Map<String, List<Integer>> entityURIs, int timestamp,
+                               Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+//        int numOfMatches = 0;
         while (iterator.hasNext()) {
             GraphMapping<Vertex, RelationshipEdge> result = iterator.next();
             Set<ConstantLiteral> literalsInMatch = new HashSet<>();
             String entityURI = extractMatch(result, patternTreeNode, literalsInMatch, vertexTypesToActiveAttributesMap);
 
             if (literalsInMatch.size() >= patternTreeNode.getPattern().getPattern().vertexSet().size()) {
-                numOfMatches++;
+//                numOfMatches++;
+                if (entityURI != null) {
+                    List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
+                    counts.set(timestamp, counts.get(timestamp) + 1);
+                }
                 matches.add(literalsInMatch);
             }
         }
-        return numOfMatches;
     }
 
     public String extractMatch(GraphMapping<Vertex, RelationshipEdge> result, PatternTreeNode patternTreeNode,
                                Set<ConstantLiteral> match, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        String entityURI = null;
+        String entityURI = "";
         for (Vertex v : patternTreeNode.getPattern().getPattern().vertexSet()) {
             Vertex currentMatchedVertex = result.getVertexCorrespondence(v, false);
             if (currentMatchedVertex != null) {
                 String tempEntityURI = extractAttributes(patternTreeNode, match, currentMatchedVertex, vertexTypesToActiveAttributesMap);
-                if (entityURI == null && tempEntityURI != null) {
+                if (tempEntityURI != null) {
                     entityURI = tempEntityURI;
-                } else if (entityURI == null) {
-                    entityURI = currentMatchedVertex.getUri();
                 }
             }
         }
@@ -128,25 +128,22 @@ public class PatternService {
                                     Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         String entityURI = null;
         String centerVertexType = patternTreeNode.getPattern().getCenterVertexType();
-        Set<ConstantLiteral> activeAttributes = getActiveAttributesInPattern(patternTreeNode.getPattern().getPattern().vertexSet(),
-                true, vertexTypesToActiveAttributesMap);
+        String matchedVertexType = currentMatchedVertex.getType();
 
         Map<String, Attribute> vertexAllAttributesMap = currentMatchedVertex.getAttributes().stream()
                 .collect(Collectors.toMap(Attribute::getAttrName, Function.identity()));
+        Set<String> activeAttributeNames = vertexTypesToActiveAttributesMap.getOrDefault(matchedVertexType, new HashSet<>());
 
-        String matchedVertexType = currentMatchedVertex.getType();
-        for (ConstantLiteral activeAttribute : activeAttributes) {
-            if (!matchedVertexType.equals(activeAttribute.getVertexType())) continue;
-            Attribute matchedAttribute = vertexAllAttributesMap.getOrDefault(activeAttribute.getAttrName(), null);
+        for (String attrName : activeAttributeNames) {
+            Attribute matchedAttribute = vertexAllAttributesMap.getOrDefault(attrName, null);
             if (matchedAttribute == null) continue;
 
-            if (matchedVertexType.equals(centerVertexType) && matchedAttribute.getAttrName().equals("uri")) {
+            if (matchedVertexType.equals(centerVertexType)) {
                 entityURI = matchedAttribute.getAttrValue();
             }
 
             String matchedAttrValue = matchedAttribute.getAttrValue();
-            ConstantLiteral xLiteral = new ConstantLiteral(matchedVertexType, activeAttribute.getAttrName(), matchedAttrValue);
-            match.add(xLiteral);
+            match.add(new ConstantLiteral(matchedVertexType, attrName, matchedAttrValue));
         }
 
         return entityURI;
@@ -154,27 +151,14 @@ public class PatternService {
 
     public Set<ConstantLiteral> getActiveAttributesInPattern(Set<Vertex> vertexSet, boolean considerURI,
                                                              Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        Map<String, Set<String>> patternVerticesAttributes = new HashMap<>();
-
-        for (Vertex vertex : vertexSet) {
-            String vertexType = vertex.getType();
-            Set<String> attrNameSet = vertexTypesToActiveAttributesMap.getOrDefault(vertexType, new HashSet<>());
-            patternVerticesAttributes.putIfAbsent(vertexType, new HashSet<>(attrNameSet));
-        }
-
-        Set<ConstantLiteral> literals = new HashSet<>();
-
-        for (Map.Entry<String, Set<String>> entry : patternVerticesAttributes.entrySet()) {
-            String vertexType = entry.getKey();
-            // TODO: 这里设置uri有什么用？
-            if (considerURI) literals.add(new ConstantLiteral(vertexType, "uri", null));
-
-            for (String attrName : entry.getValue()) {
-                literals.add(new ConstantLiteral(vertexType, attrName, null));
-            }
-        }
-        return literals;
+        return vertexSet.stream()
+                .flatMap(vertex -> {
+                    Set<String> activeAttributes = vertexTypesToActiveAttributesMap.getOrDefault(vertex.getType(), Collections.emptySet());
+                    return activeAttributes.stream().map(attrName -> new ConstantLiteral(vertex.getType(), attrName, null));
+                })
+                .collect(Collectors.toSet());
     }
+
 
     public void calculateTotalSupport(Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN,
                                       Map<PatternTreeNode, Map<String, List<Integer>>> entityURIsByPTN,
@@ -293,7 +277,6 @@ public class PatternService {
         }
         return false;
     }
-
 
     private Vertex isDuplicateVertex(VF2PatternGraph newPattern, String vertexType) {
         return newPattern.getPattern().vertexSet().stream()

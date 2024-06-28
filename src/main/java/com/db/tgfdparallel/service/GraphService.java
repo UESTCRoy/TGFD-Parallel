@@ -7,6 +7,7 @@ import org.apache.jena.riot.RDFDataMgr;
 import org.jgrapht.Graph;
 import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.jgrapht.alg.isomorphism.VF2SubgraphIsomorphismInspector;
+import org.jgrapht.graph.AsSubgraph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class GraphService {
@@ -363,62 +365,36 @@ public class GraphService {
     public Graph<Vertex, RelationshipEdge> getSubGraphWithinDiameter(Graph<Vertex, RelationshipEdge> graph, Vertex center, int diameter, Set<String> validTypes) {
         Graph<Vertex, RelationshipEdge> subgraph = new DefaultDirectedGraph<>(RelationshipEdge.class);
 
-        List<Vertex> withinDiameter = new ArrayList<>();
-        // Define a HashMap to store visited vertices
-        Map<String, Integer> visited = new HashMap<>();
-
-        // Create a queue for BFS
-        LinkedList<Vertex> queue = new LinkedList<>();
-
-        // Mark the current node as visited with distance 0 and then enqueue it
-        visited.put(center.getUri(), 0);
+        Map<Vertex, Integer> visited = new HashMap<>();
+        Queue<Vertex> queue = new LinkedList<>();
+        visited.put(center, 0);
         queue.add(center);
-        // Store the center as the node within the diameter
-        withinDiameter.add(center);
+        subgraph.addVertex(center);
 
-        Vertex v, w;
         while (!queue.isEmpty()) {
-            // Dequeue a vertex from queue and get its distance
-            v = queue.poll();
-            int distance = visited.get(v.getUri());
+            Vertex current = queue.poll();
+            int currentDistance = visited.get(current);
 
-            // Get both outgoing and incoming edges
-            Set<RelationshipEdge> edges = new HashSet<>(graph.outgoingEdgesOf(v));
-            edges.addAll(graph.incomingEdgesOf(v));
-
-            for (RelationshipEdge edge : edges) {
-                w = getConnectedVertex(v, edge);
-                // Check if the vertex is not visited
-                // Check if the vertex is within the diameter
-                if (distance + 1 <= diameter && isValidType(validTypes, w.getType()) && !visited.containsKey(w.getUri()) && graph.containsVertex(w)) {
-                    // Enqueue the vertex and add it to the visited set
-                    visited.put(w.getUri(), distance + 1);
-                    queue.add(w);
-                    withinDiameter.add(w);
-                }
+            // 只有当当前顶点距离小于直径时才继续探索
+            if (currentDistance < diameter) {
+                Stream<RelationshipEdge> edges = Stream.concat(graph.outgoingEdgesOf(current).stream(), graph.incomingEdgesOf(current).stream());
+                edges.forEach(edge -> {
+                    Vertex adjacent = getConnectedVertex(current, edge);
+                    // 确保邻接顶点符合类型要求且未被访问过
+                    if (isValidType(validTypes, adjacent.getType()) && !visited.containsKey(adjacent)) {
+                        visited.put(adjacent, currentDistance + 1);
+                        queue.add(adjacent);
+                        subgraph.addVertex(adjacent);
+                        subgraph.addEdge(edge.getSource(), edge.getTarget(), edge);
+                    }
+                });
             }
         }
-
-        for (Vertex vertex : withinDiameter) {
-            subgraph.addVertex(vertex);
-        }
-
-        for (Vertex source : withinDiameter) {
-            for (RelationshipEdge e : graph.outgoingEdgesOf(source)) {
-                if (visited.containsKey(e.getTarget().getUri()))
-                    subgraph.addEdge(e.getSource(), e.getTarget(), e);
-            }
-        }
-
         return subgraph;
     }
 
     private Vertex getConnectedVertex(Vertex v, RelationshipEdge edge) {
-        if (v.equals(edge.getSource())) {
-            return edge.getTarget();
-        } else {
-            return edge.getSource();
-        }
+        return v.equals(edge.getSource()) ? edge.getTarget() : edge.getSource();
     }
 
     public Graph<Vertex, RelationshipEdge> extractGraphToBeSent(GraphLoader graphLoader, List<SimpleEdge> edges) {
@@ -561,13 +537,12 @@ public class GraphService {
             updateEntireGraph(baseLoader.getGraph(), changeList);
 //            activeMQService.sendResult(superStepNumber);
         } catch (Exception e) {
-            logger.error("Error while updating graph and sending results" , e);
+            logger.error("Error while updating graph and sending results", e);
         }
         return baseLoader;
     }
 
-    private boolean isValidType(Set<String> validTypes, String givenType)
-    {
+    private boolean isValidType(Set<String> validTypes, String givenType) {
         return validTypes.contains(givenType);
     }
 
@@ -597,6 +572,38 @@ public class GraphService {
         }
 
         return newGraph;
+    }
+
+    public Graph<Vertex, RelationshipEdge> getSubGraphWithinDiameter(Graph<Vertex, RelationshipEdge> graph, Vertex centerVertex, int diameter) {
+        if (diameter != 1) {
+            throw new IllegalArgumentException("This method currently only supports a diameter of 1.");
+        }
+
+        // Set for vertices and edges
+        Set<Vertex> vertices = new HashSet<>();
+        Set<RelationshipEdge> edges = new HashSet<>();
+
+        // Include the center vertex
+        vertices.add(centerVertex);
+
+        // Add directly connected vertices and edges
+        Set<RelationshipEdge> outgoingEdges = graph.outgoingEdgesOf(centerVertex);
+        Set<RelationshipEdge> incomingEdges = graph.incomingEdgesOf(centerVertex);
+
+        Stream.concat(outgoingEdges.stream(), incomingEdges.stream()).forEach(edge -> {
+            Vertex source = edge.getSource();
+            Vertex target = edge.getTarget();
+
+            // Add edge if both vertices are in the subgraph
+            if (source.equals(centerVertex) || target.equals(centerVertex)) {
+                vertices.add(source);
+                vertices.add(target);
+                edges.add(edge);
+            }
+        });
+
+        // Create the subgraph with the specified vertices and edges
+        return new AsSubgraph<>(graph, vertices, edges);
     }
 
 }

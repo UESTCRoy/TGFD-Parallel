@@ -5,16 +5,15 @@ import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
 import com.db.tgfdparallel.utils.DeepCopyUtil;
 import org.jgrapht.Graph;
-import org.jgrapht.alg.isomorphism.VF2AbstractIsomorphismInspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -29,10 +28,11 @@ public class WorkerProcess {
     private final HSpawnService hSpawnService;
     private final TGFDService tgfdService;
     private final S3Service s3Service;
+    private final AsyncService asyncService;
 
     @Autowired
     public WorkerProcess(AppConfig config, ActiveMQService activeMQService, DataShipperService dataShipperService, GraphService graphService,
-                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, S3Service s3Service) {
+                         PatternService patternService, HSpawnService hSpawnService, TGFDService tgfdService, S3Service s3Service, AsyncService asyncService) {
         this.config = config;
         this.activeMQService = activeMQService;
         this.dataShipperService = dataShipperService;
@@ -41,13 +41,16 @@ public class WorkerProcess {
         this.hSpawnService = hSpawnService;
         this.tgfdService = tgfdService;
         this.s3Service = s3Service;
+        this.asyncService = asyncService;
     }
 
     private Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN;
     private Map<String, Map<String, List<Integer>>> entityURIsByPTN; // first key: centerVertexType, second key: entityURI
+    private Map<Integer, Integer> dependencyNumberMap = new HashMap<>();
 
     public void start() {
         // Send the status to the coordinator
+        long startTime = System.currentTimeMillis();
         logger.info("{} send the status to Coordinator at {}", config.getNodeName(), LocalDateTime.now());
         activeMQService.sendStatus();
 
@@ -88,10 +91,10 @@ public class WorkerProcess {
         }
         evaluatePatternSupport(patternTreeNodes, vertexHistogram);
 
-        List<TGFD> constantTGFDs = new ArrayList<>();
-        List<TGFD> generalTGFDs = new ArrayList<>();
-        Map<Integer, List<TGFD>> constantTGFDMap = new HashMap<>();
-        Map<Integer, List<TGFD>> generalTGFDMap = new HashMap<>();
+        Set<TGFD> constantTGFDs = new HashSet<>();
+        Set<TGFD> generalTGFDs = new HashSet<>();
+        Map<Integer, Set<TGFD>> constantTGFDMap = new HashMap<>();
+        Map<Integer, Set<TGFD>> generalTGFDMap = new HashMap<>();
 
         // Start VSpawn
         PatternTree patternTree = new PatternTree();
@@ -110,28 +113,24 @@ public class WorkerProcess {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
                 List<Set<Set<ConstantLiteral>>> matchesPerTimestamps = new ArrayList<>(Collections.nCopies(config.getTimestamp(), new HashSet<>()));
-
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
-//                if (level == 1 && numOfNewJobs < 100 * config.getTimestamp()) {
-//                    logger.info("The number of new jobs is too small, skip this pattern");
-//                    newPattern.setPruned(true);
-//                    continue;
-//                }
                 String centerVertexType = newPattern.getPattern().getCenterVertexType();
                 Map<String, List<Integer>> entityURIs = entityURIsByPTN.get(centerVertexType);
+                // For Support Computing
+                Map<String, List<Integer>> ptnEntityURIs = new ConcurrentHashMap<>();
 
                 List<CompletableFuture<Integer>> futures = new ArrayList<>();
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
-                    CompletableFuture<Integer> future = runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, vertexTypesToActiveAttributesMap);
+                    CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
                     futures.add(future);
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
-                double newPatternSupport = patternService.calculatePatternSupport(entityURIs,
+                double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
                         vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
                 logger.info("The pattern support for pattern: {} is {}", pattern, newPatternSupport);
                 newPattern.setPatternSupport(newPatternSupport);
@@ -143,13 +142,17 @@ public class WorkerProcess {
                 matchesPerTimestampsByPTN.put(newPattern, matchesPerTimestamps);
 
                 // 计算新pattern的HSpawn
-                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps);
+                CompletableFuture<List<List<TGFD>>> futureTGFDs = hSpawnService.performHSPawn(
+                        vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps, dependencyNumberMap);
+                List<List<TGFD>> tgfds = futureTGFDs.join();
+
                 if (tgfds.size() == 2 && level > 1) {
                     constantTGFDs.addAll(tgfds.get(0));
                     generalTGFDs.addAll(tgfds.get(1));
+
+                    logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
+                            level, newPattern.getPattern().getPattern(), tgfds.get(0).size(), tgfds.get(1).size());
                 }
-                logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
-                        level, newPattern.getPattern().getPattern(), constantTGFDs.size(), generalTGFDs.size());
             }
         }
         logger.info("======================================");
@@ -159,22 +162,27 @@ public class WorkerProcess {
         // 生成constant与general的TGFD Map，返回给Coordinator汇总
         for (TGFD data : constantTGFDs) {
             int hashKey = tgfdService.getConstantTGFDKey(data.getDependency());
-            List<TGFD> constantTGFDsList = constantTGFDMap.computeIfAbsent(hashKey, k -> new ArrayList<>());
-            constantTGFDsList.add(data);
+            constantTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>()).add(data);
         }
         for (TGFD data : generalTGFDs) {
             int hashKey = tgfdService.getGeneralTGFDKey(data.getDependency());
-            List<TGFD> generalTGFDsList = generalTGFDMap.computeIfAbsent(hashKey, k -> new ArrayList<>());
-            generalTGFDsList.add(data);
+            generalTGFDMap.computeIfAbsent(hashKey, k -> new HashSet<>()).add(data);
         }
 
         // Send data(Constant TGFDs) back to coordinator
         logger.info("Send {} constant and {} general TGFDs to Coordinator", constantTGFDs.size(), generalTGFDs.size());
-        dataShipperService.uploadTGFD(constantTGFDMap, generalTGFDMap);
+        dataShipperService.uploadTGFD(dependencyNumberMap, constantTGFDMap, generalTGFDMap);
         logger.info(config.getNodeName() + " Done");
         if (dataShipperService.isAmazonMode()) {
             s3Service.stopInstance();
         }
+
+        long endTime = System.currentTimeMillis();
+        long durationMillis = endTime - startTime;
+        long hours = durationMillis / 3600000; // 3600000 毫秒/小时
+        long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
+        long seconds = ((durationMillis % 3600000) % 60000) / 1000;
+        logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
     }
 
     private ProcessedHistogramData receiveAndProcessHistogramData() {
@@ -236,46 +244,6 @@ public class WorkerProcess {
                 logger.info("Pruned pattern {} due to insufficient support.", ptn.getPattern().getPattern());
             }
         });
-    }
-
-    @Async
-    public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
-                                                       Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
-                                                       Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        return CompletableFuture.completedFuture(
-                runSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, vertexTypesToActiveAttributesMap)
-        );
-    }
-
-    public int runSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader, Set<Set<ConstantLiteral>> matchesOnTimestamps, int level,
-                           Map<String, List<Integer>> entityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
-        String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
-        level = Math.min(level, 2);
-
-        Set<String> validTypes = newPattern.getPattern().getPattern().vertexSet().stream()
-                .map(Vertex::getType)
-                .collect(Collectors.toSet());
-
-        int finalLevel = level;
-        graph.vertexSet().stream()
-                .filter(vertex -> vertex.getType().equals(centerVertexType))
-                .filter(vertex -> entityURIs.containsKey(vertex.getUri()) )
-                .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
-                .forEach(centerVertex -> {
-                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, 1, validTypes);
-                    VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results =
-                            graphService.checkIsomorphism(subgraph, newPattern.getPattern(), false);
-
-                    if (results.isomorphismExists()) {
-                        Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                        patternService.extractMatches(results.getMappings(), matches, newPattern, snapshotID, vertexTypesToActiveAttributesMap);
-                        matchesOnTimestamps.addAll(matches);
-                    }
-                });
-        int matchesSize = matchesOnTimestamps.size();
-        logger.info("Found {} matches in snapshot {}", matchesSize, snapshotID);
-        return matchesSize;
     }
 }
 
