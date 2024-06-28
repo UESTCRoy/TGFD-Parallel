@@ -50,6 +50,7 @@ public class WorkerProcess {
 
     public void start() {
         // Send the status to the coordinator
+        long startTime = System.currentTimeMillis();
         logger.info("{} send the status to Coordinator at {}", config.getNodeName(), LocalDateTime.now());
         activeMQService.sendStatus();
 
@@ -175,6 +176,13 @@ public class WorkerProcess {
         if (dataShipperService.isAmazonMode()) {
             s3Service.stopInstance();
         }
+
+        long endTime = System.currentTimeMillis();
+        long durationMillis = endTime - startTime;
+        long hours = durationMillis / 3600000; // 3600000 毫秒/小时
+        long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
+        long seconds = ((durationMillis % 3600000) % 60000) / 1000;
+        logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
     }
 
     private ProcessedHistogramData receiveAndProcessHistogramData() {

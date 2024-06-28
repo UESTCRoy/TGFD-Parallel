@@ -45,6 +45,7 @@ public class CoordinatorProcess {
     }
 
     public void start() {
+        long startTime = System.currentTimeMillis();
         initializeWorkers();
 
         // Graph Path
@@ -128,6 +129,13 @@ public class CoordinatorProcess {
 //        if (dataShipperService.isAmazonMode()) {
 //
 //        }
+
+        long endTime = System.currentTimeMillis();
+        long durationMillis = endTime - startTime;
+        long hours = durationMillis / 3600000; // 3600000 毫秒/小时
+        long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
+        long seconds = ((durationMillis % 3600000) % 60000) / 1000;
+        logger.info("The coordinator process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
     }
 
     private void initializeWorkers() {

@@ -92,23 +92,21 @@ public class PatternService {
     public void extractMatches(Iterator<GraphMapping<Vertex, RelationshipEdge>> iterator, Set<Set<ConstantLiteral>> matches,
                                PatternTreeNode patternTreeNode, Map<String, List<Integer>> entityURIs, int timestamp,
                                Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        List<GraphMapping<Vertex, RelationshipEdge>> mappings = new ArrayList<>();
-        iterator.forEachRemaining(mappings::add);
-
-        mappings.parallelStream().forEach(result -> {
+//        int numOfMatches = 0;
+        while (iterator.hasNext()) {
+            GraphMapping<Vertex, RelationshipEdge> result = iterator.next();
             Set<ConstantLiteral> literalsInMatch = new HashSet<>();
             String entityURI = extractMatch(result, patternTreeNode, literalsInMatch, vertexTypesToActiveAttributesMap);
 
             if (literalsInMatch.size() >= patternTreeNode.getPattern().getPattern().vertexSet().size()) {
-                synchronized (matches) {
-                    if (entityURI != null) {
-                        List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
-                        counts.set(timestamp, counts.get(timestamp) + 1);
-                    }
-                    matches.add(literalsInMatch);
+//                numOfMatches++;
+                if (entityURI != null) {
+                    List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
+                    counts.set(timestamp, counts.get(timestamp) + 1);
                 }
+                matches.add(literalsInMatch);
             }
-        });
+        }
     }
 
     public String extractMatch(GraphMapping<Vertex, RelationshipEdge> result, PatternTreeNode patternTreeNode,
