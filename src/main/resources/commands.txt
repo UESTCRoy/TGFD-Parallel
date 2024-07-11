@@ -1,11 +1,11 @@
 1. 1m_IMDB
 Coordinator:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=12 --firstGraphPath=/home/wang851/data/imdb/completeGraph/1m_imdb/imdb-170909.nt --changeFilePath=/home/wang851/data/imdb/changeFile/1m_change
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=4 --firstGraphPath=/home/wang851/data/dbpedia/completeGraph/8m_dbpedia/2014.nt --changeFilePath=/home/wang851/data/dbpedia/changeFile/8m_change
 Zurich:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/1m_imdb_split4/1m_1/imdb0-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_1/2014-0.nt
 Geneva:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/1m_imdb_split4/1m_2/imdb1-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_2/2014-1.nt
 Tokyo:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/1m_imdb_split4/1m_3/imdb2-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_3/2014-2.nt
 Salzburg:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/1m_imdb_split4/1m_4/imdb3-170909.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_4/2014-3.nt

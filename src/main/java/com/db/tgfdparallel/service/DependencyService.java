@@ -25,7 +25,7 @@ public class DependencyService {
     public boolean isSuperSetOfPath(AttributeDependency dependency, List<AttributeDependency> prunedDependencies) {
         for (AttributeDependency prunedPath : prunedDependencies) {
             if (prunedPath == null) {
-                logger.error("A pruned path in the list is null");
+//                logger.error("A pruned path in the list is null");
                 continue;
             }
             if (dependency.getRhs().equals(prunedPath.getRhs()) && dependency.getLhs().containsAll(prunedPath.getLhs())) {
@@ -199,7 +199,7 @@ public class DependencyService {
             entitiesWithSortedRHSvalues.put(entityEntry.getKey(), sortedRhsMapOfEntity);
         }
         long endTime = System.currentTimeMillis();
-        logger.info("Time to find entities {}: {}", dependency, (endTime - startTime));
+//        logger.info("Time to find entities {}: {}", dependency, (endTime - startTime));
 
         return entitiesWithSortedRHSvalues;
     }

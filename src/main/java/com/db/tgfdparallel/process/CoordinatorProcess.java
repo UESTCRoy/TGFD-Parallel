@@ -22,7 +22,6 @@ public class CoordinatorProcess {
     private final HistogramService histogramService;
     private final PatternService patternService;
     private final ActiveMQService activeMQService;
-    private final JobService jobService;
     private final DataShipperService dataShipperService;
     private final ChangeService changeService;
     private final TGFDService tgfdService;
@@ -30,14 +29,13 @@ public class CoordinatorProcess {
 
     @Autowired
     public CoordinatorProcess(AppConfig config, GraphService graphService, HistogramService histogramService, PatternService patternService,
-                              ActiveMQService activeMQService, JobService jobService, DataShipperService dataShipperService, ChangeService changeService,
+                              ActiveMQService activeMQService, DataShipperService dataShipperService, ChangeService changeService,
                               TGFDService tgfdService, S3Service s3Service) {
         this.config = config;
         this.graphService = graphService;
         this.histogramService = histogramService;
         this.patternService = patternService;
         this.activeMQService = activeMQService;
-        this.jobService = jobService;
         this.dataShipperService = dataShipperService;
         this.changeService = changeService;
         this.tgfdService = tgfdService;
@@ -64,6 +62,7 @@ public class CoordinatorProcess {
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
         dataShipperService.sendHistogramData(histogramData);
+        printHistogram(histogramData);
 
         List<FrequencyStatistics> sortedVertexHistogram = histogramData.getSortedVertexHistogram();
         Set<String> vertexTypes = sortedVertexHistogram
@@ -142,6 +141,24 @@ public class CoordinatorProcess {
         logger.info("Check the status of the workers");
         activeMQService.initializeWorkersStatus();
         activeMQService.statusCheck();
+    }
+
+    private void printHistogram(ProcessedHistogramData histogramData) {
+        histogramData.getSortedVertexHistogram().forEach(vertex -> {
+            logger.info("Vertex Type: {}, Frequency: {}", vertex.getType(), vertex.getFrequency());
+        });
+        histogramData.getSortedFrequentEdgesHistogram().forEach(edge -> {
+            logger.info("Edge: {}", edge);
+        });
+        histogramData.getVertexTypesToActiveAttributesMap().forEach((key, value) -> {
+            logger.info("Vertex Type: {}, Active Attributes: {}", key, value);
+        });
+        Set<String> allAttributes = histogramData.getVertexTypesToActiveAttributesMap().values().stream()
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+        allAttributes.forEach(attribute -> {
+            logger.info("Attribute: {}", attribute);
+        });
     }
 
 }

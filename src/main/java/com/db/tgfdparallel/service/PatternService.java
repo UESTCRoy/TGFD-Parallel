@@ -461,7 +461,7 @@ public class PatternService {
                             .collect(Collectors.toSet());
 
                     if (newPatternEdges.containsAll(otherPatternEdges)) {
-                        System.out.println("Candidate pattern: " + newPattern + " is a supergraph of pruned subgraph pattern: " + treeNode.getPattern());
+                        logger.info("Candidate pattern: " + newPattern + " is a supergraph of pruned subgraph pattern: " + treeNode.getPattern());
                         return true;
                     }
                 }

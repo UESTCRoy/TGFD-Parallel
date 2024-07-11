@@ -96,7 +96,7 @@ public class TGFDService {
             long rhsDiscoveryEndTime = System.currentTimeMillis();
         }
         long endTime = System.currentTimeMillis();
-        logger.info("Time taken to discover constant TGFDs: {} ms, there are {} entities", (endTime - startTime), entities.size());
+//        logger.info("Time taken to discover constant TGFDs: {} ms, there are {} entities", (endTime - startTime), entities.size());
 
         return result;
     }
@@ -160,14 +160,15 @@ public class TGFDService {
             logger.info("Added minimal dependency: {}", literalPath);
         }
         long endTime = System.currentTimeMillis();
-        logger.info("Time taken to discover general TGFDs: {} ms on {}, and there are {} general TGFD", (endTime - startTime), literalPath, tgfds.size());
+//        logger.info("Time taken to discover general TGFDs: {} ms on {}, and there are {} general TGFD", (endTime - startTime), literalPath, tgfds.size());
         return tgfds;
     }
 
     public double calculateTGFDSupport(double numerator, double S, int T) {
         double denominator = S * CombinatoricsUtils.binomialCoefficient(T + 1, 2);
         if (numerator > denominator) {
-            throw new IllegalArgumentException("numerator > denominator");
+//            throw new IllegalArgumentException("numerator > denominator");
+            return 0.0;
         }
         return numerator / denominator;
     }

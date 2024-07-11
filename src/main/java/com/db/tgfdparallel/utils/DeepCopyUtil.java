@@ -5,8 +5,11 @@ import com.esotericsoftware.kryo.kryo5.Kryo;
 import com.esotericsoftware.kryo.kryo5.io.Input;
 import com.esotericsoftware.kryo.kryo5.io.Output;
 import org.jgrapht.graph.DefaultDirectedGraph;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DeepCopyUtil {
+    private static final Logger logger = LoggerFactory.getLogger(DeepCopyUtil.class);
     private static Kryo kryo = new Kryo();
 
     static {
@@ -23,14 +26,18 @@ public class DeepCopyUtil {
     }
 
     public static <T> T deepCopy(T original) {
-        Output output = new Output(4096, -1);
-        kryo.writeObject(output, original);
-        output.close();
+        try {
+            Output output = new Output(4096, -1);
+            kryo.writeObject(output, original);
+            output.close();
 
-        Input input = new Input(output.getBuffer());
-        T copy = (T) kryo.readObject(input, original.getClass());
-        input.close();
-
-        return copy;
+            Input input = new Input(output.getBuffer());
+            T copy = (T) kryo.readObject(input, original.getClass());
+            input.close();
+            return copy;
+        } catch (Exception e) {
+            logger.error("Failed to deep copy object", e);
+            return null;
+        }
     }
 }

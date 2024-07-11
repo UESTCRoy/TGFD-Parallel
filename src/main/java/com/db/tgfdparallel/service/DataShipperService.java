@@ -338,6 +338,7 @@ public class DataShipperService {
         try {
             List<String> TGFDsFile = activeMQService.receiveTGFDsFromWorker(type);
             for (String fileName : TGFDsFile) {
+                logger.info("Downloading {} TGFDs from {}", type, fileName);
                 Map<Integer, Integer> data = (Map<Integer, Integer>) downloadObject(fileName);
                 logger.info("Got {} {} TGFDs from {}", data.size(), type, fileName);
                 for (Map.Entry<Integer, Integer> entry : data.entrySet()) {

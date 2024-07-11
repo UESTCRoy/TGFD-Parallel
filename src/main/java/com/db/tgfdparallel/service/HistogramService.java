@@ -94,7 +94,7 @@ public class HistogramService {
         List<FrequencyStatistics> sortedFrequentEdgesHistogram = setSortedFrequentEdgeHistogram(data.getEdgeTypesHistogram());
         List<FrequencyStatistics> sortedVertexHistogram = setSortedFrequentVerticesUsingFrequentEdges(sortedFrequentEdgesHistogram, data.getVertexTypesHistogram());
 
-        Set<String> seenLabels = new HashSet<>();
+        Map<String, Set<String>> seenMap = new HashMap<>();
         List<String> frequentEdgesData = sortedFrequentEdgesHistogram.stream()
                 .map(FrequencyStatistics::getType)
                 .filter(edge -> {
@@ -103,10 +103,11 @@ public class HistogramService {
                     String targetVertexType = parts[2];
                     String label = edge.split(" ")[1];
 
-                    // Check if the label has already been processed
-                    if (!seenLabels.add(label)) { // add returns false if the item was already in the set
-                        logger.info("Label {} already exists, skip this edge: {}", label, edge);
-                        return false;
+                    if (seenMap.containsKey(sourceVertexType)) {
+                        if (seenMap.get(sourceVertexType).contains(targetVertexType)) {
+                            logger.info("The edge is already seen, skip this edge: {}", edge);
+                            return false;
+                        }
                     }
 
                     // Check if source and target vertex types are the same
@@ -120,6 +121,8 @@ public class HistogramService {
                         logger.info("The sourceVertexType or targetVertexType doesn't have active attributes, skip this edge: {}", edge);
                         return false;
                     }
+
+                    seenMap.computeIfAbsent(sourceVertexType, k -> new HashSet<>()).add(targetVertexType);
 
                     return true;
                 })

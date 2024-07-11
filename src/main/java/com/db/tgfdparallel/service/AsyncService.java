@@ -54,13 +54,14 @@ public class AsyncService {
                 .map(Vertex::getType)
                 .collect(Collectors.toSet());
 
+        final int finalLevel = level;
         graph.vertexSet().stream()
                 .filter(vertex -> vertex.getType().equals(centerVertexType))
                 .filter(vertex -> entityURIs.containsKey(vertex.getUri()))
                 .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
                     long subGraphStartTime = System.currentTimeMillis();
-                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, 1, validTypes);
+                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, finalLevel, validTypes);
                     long subGraphEndTime = System.currentTimeMillis();
                     long subGraphDuration = subGraphEndTime - subGraphStartTime;
                     if (subGraphDuration > 10000) {
@@ -98,7 +99,7 @@ public class AsyncService {
         long startTime = System.currentTimeMillis();
         List<List<TGFD>> result = findTGFDs(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap);
         long endTime = System.currentTimeMillis();
-        logger.info("Async task for finding TGFDs for dependency {} completed in {} ms", newPath, (endTime - startTime));
+//        logger.info("Async task for finding TGFDs for dependency {} completed in {} ms", newPath, (endTime - startTime));
         return CompletableFuture.completedFuture(result);
     }
 
@@ -115,7 +116,7 @@ public class AsyncService {
         dependencyNumberMap.put(dependencyKey, entities.size());
 
         Set<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs, dependencyKey);
-        logger.info("There are {} constant TGFDs discovered for dependency {}", constantTGFD.size(), newPath);
+//        logger.info("There are {} constant TGFDs discovered for dependency {}", constantTGFD.size(), newPath);
         result.get(0).addAll(constantTGFD);
 
         if (!candidatePairs.isEmpty()) {
