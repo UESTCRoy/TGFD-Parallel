@@ -67,14 +67,13 @@ public class WorkerProcess {
         // Receive the pattern tree from the coordinator
         List<PatternTreeNode> patternTreeNodes = receivePatternTreeNodes();
 
-        // Load the first snapshot
-        String dataPath = dataShipperService.workerDataPreparation();
-        GraphLoader initialLoader = graphService.loadFirstSnapshot(dataPath, vertexTypes);
-        logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
-                initialLoader.getGraph().getGraph().edgeSet().size(), initialLoader.getGraph().getGraph().vertexSet().size());
-
-        // By using the change file, generate new loader for each snapshot
-        GraphLoader[] loaders = processChangesAndLoadSubsequentSnapshots(initialLoader);
+        List<String> allDataPaths = dataShipperService.workerDBPediaPreparation();
+        GraphLoader[] loaders = new GraphLoader[allDataPaths.size()];
+        for (int i = 0; i < allDataPaths.size(); i++) {
+            loaders[i] = graphService.loadFirstSnapshot(allDataPaths.get(i), vertexTypes);
+            logger.info("Load the {} split graph, graph edge size: {}, graph vertex size: {}",
+                    i, loaders[i].getGraph().getGraph().edgeSet().size(), loaders[i].getGraph().getGraph().vertexSet().size());
+        }
 
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         initializePatternDataStructures(patternTreeNodes);

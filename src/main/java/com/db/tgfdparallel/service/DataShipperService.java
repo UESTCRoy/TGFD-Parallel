@@ -434,6 +434,21 @@ public class DataShipperService {
         }
     }
 
+    public List<String> workerDBPediaPreparation() {
+        List<String> allDataPath = config.getAllDataPath();
+        List<String> destinationFiles = new ArrayList<>();
+        if (isAmazonMode()) {
+            for (String dataPath : allDataPath) {
+                String fileName = getFileNameFromPath(dataPath);
+                String destinationFile = "/home/ec2-user/dataPath/" + fileName;
+                s3Service.downloadFileToInstance(dataPath, destinationFile);
+                destinationFiles.add(destinationFile);
+            }
+            return destinationFiles;
+        }
+        return allDataPath;
+    }
+
     public void processPaths(List<String> paths, String homePath) {
         for (int i = 0; i < paths.size(); i++) {
             String dataPath = paths.get(i);

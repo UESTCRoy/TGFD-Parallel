@@ -82,9 +82,9 @@ public class AsyncService {
                         patternService.extractMatches(results.getMappings(), matches, newPattern, ptnEntityURIs, snapshotID, vertexTypesToActiveAttributesMap);
                         long extractMatchesEndTime = System.currentTimeMillis();
                         long extractDuration = extractMatchesEndTime - extractMatchesStartTime;
-                        if (extractDuration > 10000) {
-                            logger.info("Snapshot {}: Extraction took {} ms, Matches: {}", snapshotID, extractDuration, matches.size());
-                        }
+//                        if (extractDuration > 10000) {
+//                            logger.info("Snapshot {}: Extraction took {} ms, Matches: {}", snapshotID, extractDuration, matches.size());
+//                        }
 
                         matchesOnTimestamps.addAll(matches);
                     }

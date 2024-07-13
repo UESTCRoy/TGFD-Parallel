@@ -1,11 +1,11 @@
 1. 1m_IMDB
 Coordinator:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=4 --firstGraphPath=/home/wang851/data/dbpedia/completeGraph/8m_dbpedia/2014.nt --changeFilePath=/home/wang851/data/dbpedia/changeFile/8m_change
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=4 --firstGraphPath=/home/wang851/data/dbpedia/completeGraph/2m_dbpedia/2014.nt
 Zurich:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_1/2014-0.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=4 --allDataPath=/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_1/2014-0.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_1/2015-0.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_1/2016-0.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_1/2017-0.nt
 Geneva:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_2/2014-1.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --timestamp=4 --allDataPath=/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_2/2014-1.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_2/2015-1.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_2/2016-1.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_2/2017-1.nt
 Tokyo:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_3/2014-2.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --timestamp=4 --allDataPath=/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_3/2014-2.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_3/2015-2.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_3/2016-2.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_3/2017-2.nt
 Salzburg:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --timestamp=4 --dataPath=/home/wang851/data/dbpedia/splitGraph/8m_dbpedia_split4/8m_4/2014-3.nt
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --timestamp=4 --allDataPath=/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_4/2014-3.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_4/2015-3.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_4/2016-3.nt,/home/wang851/data/dbpedia/splitGraph/2m_dbpedia_split4/2m_4/2017-3.nt
