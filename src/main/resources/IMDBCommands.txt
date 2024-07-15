@@ -1,0 +1,11 @@
+1. imdb
+Coordinator:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=3 --firstGraphPath=/home/wang851/data/imdb/completeGraph/300k_imdb/imdb-170909.nt
+Zurich:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=3 --allDataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_1/imdb0-170909.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_1/2015-0.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_1/2016-0.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_1/2017-0.nt
+Geneva:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --timestamp=3 --allDataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_2/imdb1-170909.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_2/2015-1.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_2/2016-1.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_2/2017-1.nt
+Tokyo:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --timestamp=3 --allDataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_3/imdb2-170909.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_3/2015-2.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_3/2016-2.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_3/2017-2.nt
+Salzburg:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --timestamp=3 --allDataPath=/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_4/imdb3-170909.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_4/2015-3.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_4/2016-3.nt,/home/wang851/data/imdb/splitGraph/300k_imdb_split4/300k_4/2017-3.nt

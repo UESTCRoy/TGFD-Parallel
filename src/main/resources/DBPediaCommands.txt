@@ -1,0 +1,11 @@
+1. DBPedia
+Coordinator:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=1 --firstGraphPath=/home/wang851/data/dbpedia/completeGraph/800k_dbpedia/2014.nt
+Zurich:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=1 --allDataPath=/home/wang851/data/dbpedia/splitGraph/800k_dbpedia_split4/800k_1/2014-0.nt
+Geneva:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=geneva --timestamp=1 --allDataPath=/home/wang851/data/dbpedia/splitGraph/800k_dbpedia_split4/800k_2/2014-1.nt
+Tokyo:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=tokyo --timestamp=1 --allDataPath=/home/wang851/data/dbpedia/splitGraph/800k_dbpedia_split4/800k_3/2014-2.nt
+Salzburg:
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=salzburg --timestamp=1 --allDataPath=/home/wang851/data/dbpedia/splitGraph/800k_dbpedia_split4/800k_4/2014-3.nt
