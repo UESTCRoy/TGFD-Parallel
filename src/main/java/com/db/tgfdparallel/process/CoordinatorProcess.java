@@ -25,9 +25,10 @@ public class CoordinatorProcess {
     private final DataShipperService dataShipperService;
     private final TGFDService tgfdService;
     private final S3Service s3Service;
+    private final ChangeService changeService;
 
     @Autowired
-    public CoordinatorProcess(AppConfig config, GraphService graphService, HistogramService histogramService, PatternService patternService,
+    public CoordinatorProcess(AppConfig config, GraphService graphService, HistogramService histogramService, PatternService patternService, ChangeService changeService,
                               ActiveMQService activeMQService, DataShipperService dataShipperService, TGFDService tgfdService, S3Service s3Service) {
         this.config = config;
         this.graphService = graphService;
@@ -37,6 +38,7 @@ public class CoordinatorProcess {
         this.dataShipperService = dataShipperService;
         this.tgfdService = tgfdService;
         this.s3Service = s3Service;
+        this.changeService = changeService;
     }
 
     public void start() {
@@ -45,7 +47,7 @@ public class CoordinatorProcess {
 
         // Graph Path
         String firstGraphPath = config.getFirstGraphPath();
-
+        String changeFilePath = config.getChangeFilePath();
         // Generate histogram and send the histogram data to all workers
         List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshots(Stream.of(firstGraphPath).collect(Collectors.toList()));
 
@@ -70,6 +72,23 @@ public class CoordinatorProcess {
         // Send single pattern tree to the worker
         logger.info("Send single pattern tree to the worker");
         activeMQService.sendMessage("#singlePattern" + "\t" + fileName);
+
+//        // Generate all the changes for histogram computation and send to all workers
+//        List<List<Change>> changesData = changeService.changeGenerator(changeFilePath, config.getTimestamp());
+//        logger.info("Generating change files for {} snapshots and got {} change files", config.getTimestamp(), changesData.size());
+//        // Send the changes to the workers
+//        // 一次性把change上传，然后让worker逐步生成new graph
+//        StringBuilder sb = new StringBuilder("#change");
+//        for (int i = 0; i < changesData.size(); i++) {
+//            String changeFileName = dataShipperService.changeShipped(changesData.get(i), i + 2);
+//            sb.append("\n").append(changeFileName);
+//        }
+//        for (String worker : config.getWorkers()) {
+//            activeMQService.connectProducer();
+//            activeMQService.send(worker, sb.toString());
+//            logger.info("Change objects have been shared with '" + worker + "' successfully");
+//            activeMQService.closeProducer();
+//        }
 
         Map<Integer, Integer> dependencyMap = dataShipperService.downloadDependencyMap("dependency");
 

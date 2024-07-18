@@ -104,44 +104,21 @@ public class AsyncService {
 
         Set<String> validTypes = newPattern.getPattern().getPattern().vertexSet().stream()
                 .map(Vertex::getType)
+                .filter(type -> !type.equals(centerVertexType))
                 .collect(Collectors.toSet());
+
+        PatternType patternType = patternService.assignPatternType(newPattern.getPattern());
+        logger.info("Pattern shape: {}", patternType);
 
         graph.vertexSet().stream()
                 .filter(vertex -> vertex.getType().equals(centerVertexType) && entityURIs.containsKey(vertex.getUri()) && entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
-                    PatternType patternType = patternService.assignPatternType(newPattern.getPattern());
                     int diameter = (patternType == PatternType.Line || patternType == PatternType.Circle || patternType == PatternType.Complex) ? 2 : 1;
                     Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, diameter, validTypes);
                     Set<String> realGraphVertexTypes = subgraph.vertexSet().stream().map(Vertex::getType).collect(Collectors.toSet());
-
                     if (realGraphVertexTypes.containsAll(validTypes)) {
-                        switch (patternType) {
-                            case SingleEdge:
-                                fastMatchService.findAllMatchesOfSingleEdgePatternInSnapshotUsingCenterVertex(newPattern.getPattern().getPattern(), centerVertexType, subgraph,
-                                        centerVertex, snapshotID, matchesOnTimestamps, ptnEntityURIs, vertexTypesToActiveAttributesMap);
-                                break;
-                            case DoubleEdge:
-                                fastMatchService.findAllMatchesOfK2PatternInSnapshotUsingCenterVertex(newPattern.getPattern(), centerVertexType, subgraph,
-                                        centerVertex, snapshotID, matchesOnTimestamps, ptnEntityURIs, vertexTypesToActiveAttributesMap);
-                                break;
-                            case Star:
-                                fastMatchService.findAllMatchesOfStarPatternInSnapshotUsingCenterVertex(newPattern.getPattern(), centerVertexType, subgraph,
-                                        centerVertex, snapshotID, matchesOnTimestamps, ptnEntityURIs, vertexTypesToActiveAttributesMap);
-                                break;
-                            case Line:
-                            case Circle:
-                                fastMatchService.findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(newPattern.getPattern(), subgraph, centerVertex, snapshotID,
-                                        matchesOnTimestamps, ptnEntityURIs, vertexTypesToActiveAttributesMap, patternType == PatternType.Circle);
-                                break;
-                            case Complex:
-                                VF2AbstractIsomorphismInspector<Vertex, RelationshipEdge> results = graphService.checkIsomorphism(subgraph, newPattern.getPattern(), false);
-                                if (results.isomorphismExists()) {
-                                    Set<Set<ConstantLiteral>> matches = new HashSet<>();
-                                    patternService.extractMatches(results.getMappings(), matches, newPattern, ptnEntityURIs, snapshotID, vertexTypesToActiveAttributesMap);
-                                    matchesOnTimestamps.addAll(matches);
-                                }
-                                break;
-                        }
+                        fastMatchService.findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(newPattern.getPattern(), subgraph, centerVertex, snapshotID,
+                                matchesOnTimestamps, ptnEntityURIs, vertexTypesToActiveAttributesMap);
                     }
                 });
 

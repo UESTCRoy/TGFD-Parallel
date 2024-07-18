@@ -226,74 +226,38 @@ public class FastMatchService {
 
     // Line and Cyclic
     public void findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(VF2PatternGraph pattern, Graph<Vertex, RelationshipEdge> realGraph, Vertex centerVertex, int timestamp,
-                                                                        Set<Set<ConstantLiteral>> matchesAroundCenterVertex, Map<String, List<Integer>> ptnEntityURIs,
-                                                                        Map<String, Set<String>> vertexTypesToActiveAttributesMap, boolean isCyclic) {
-        List<List<Vertex>> currentMatches = new ArrayList<>();
-        currentMatches.add(Arrays.asList(centerVertex));
+                                                                       Set<Set<ConstantLiteral>> matchesAroundCenterVertex, Map<String, List<Integer>> ptnEntityURIs,
+                                                                       Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+        Set<String> patternEdges = pattern.getPattern().edgeSet().stream()
+                .map(edge -> edge.getSource().getType() + edge.getLabel() + edge.getTarget().getType())
+                .collect(Collectors.toSet());
 
-        List<RelationshipEdge> edgesInPattern = new ArrayList<>(pattern.getPattern().edgeSet());
+        Set<String> realGraphEdges = realGraph.edgeSet().stream()
+                .map(edge -> edge.getSource().getType() + edge.getLabel() + edge.getTarget().getType())
+                .collect(Collectors.toSet());
 
-        for (int i = 0; i < edgesInPattern.size(); i++) {
-            RelationshipEdge edge = edgesInPattern.get(i);
-            List<List<Vertex>> newMatches = new ArrayList<>();
-
-            for (List<Vertex> connectedVertices : currentMatches) {
-                Vertex lastVertex = connectedVertices.get(connectedVertices.size() - 1);
-                Set<Vertex> nextVertices = findMatchingVertices(realGraph, lastVertex, edge, centerVertex, isCyclic);
-
-                for (Vertex vertex : nextVertices) {
-                    List<Vertex> newConnectedVertices = new ArrayList<>(connectedVertices);
-                    newConnectedVertices.add(vertex);
-                    newMatches.add(newConnectedVertices);
-                }
-            }
-
-            currentMatches = newMatches;
+        if (!realGraphEdges.containsAll(patternEdges) || realGraphEdges.size() != patternEdges.size()) {
+            return;
         }
 
-        extractValidMatches(pattern.getPattern(), currentMatches, centerVertex, timestamp, matchesAroundCenterVertex, ptnEntityURIs, vertexTypesToActiveAttributesMap);
-    }
+        Map<String, Set<Vertex>> patternVertexToDataVerticesMap = realGraph.vertexSet().stream()
+                .collect(Collectors.groupingBy(Vertex::getType, Collectors.toSet()));
+        patternVertexToDataVerticesMap.remove(centerVertex.getType());
 
-    private Set<Vertex> findMatchingVertices(Graph<Vertex, RelationshipEdge> realGraph, Vertex currentVertex, RelationshipEdge patternEdge, Vertex startVertex, boolean isCyclic) {
-        Set<Vertex> matchingVertices = new HashSet<>();
-        // Assuming getConnectedEdges returns relevant edges for a vertex that could form part of the pattern
-        Set<RelationshipEdge> candidateEdges = realGraph.edgesOf(currentVertex);
+        Set<ConstantLiteral> centerDataVertexLiterals = getCenterDataVertexLiterals(centerVertex, vertexTypesToActiveAttributesMap.get(centerVertex.getType()));
+        List<Set<Vertex>> listOfDataVertexSets = new ArrayList<>(patternVertexToDataVerticesMap.values());
+        Set<List<Vertex>> allCombinations = MathUtil.cartesianProduct(listOfDataVertexSets);
 
-        for (RelationshipEdge candidateEdge : candidateEdges) {
-            if (edgeMatchesPattern(candidateEdge, patternEdge)) {
-                Vertex nextVertex = candidateEdge.getTarget().equals(currentVertex) ? candidateEdge.getSource() : candidateEdge.getTarget();
-                if (!isCyclic || !nextVertex.equals(startVertex)) { // Check for cyclic conditions
-                    matchingVertices.add(nextVertex);
-                }
-            }
-        }
-        return matchingVertices;
-    }
-
-    private boolean edgeMatchesPattern(RelationshipEdge dataEdge, RelationshipEdge patternEdge) {
-        return dataEdge.getLabel().equals(patternEdge.getLabel()) &&
-                dataEdge.getSource().getType().equals(patternEdge.getSource().getType()) &&
-                dataEdge.getTarget().getType().equals(patternEdge.getTarget().getType());
-    }
-
-    private void extractValidMatches(Graph<Vertex, RelationshipEdge> patternGraph, List<List<Vertex>> currentMatches, Vertex centerDataVertex, int year,
-                                     Set<Set<ConstantLiteral>> matchesAroundCenterVertex, Map<String, List<Integer>> entityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
-        Set<Vertex> patternVertexSet = patternGraph.vertexSet();
-        Set<ConstantLiteral> centerDataVertexLiterals = getCenterDataVertexLiterals(centerDataVertex, vertexTypesToActiveAttributesMap.get(centerDataVertex.getType()));
-
-        for (List<Vertex> vertexList : currentMatches) {
+        for (List<Vertex> combination : allCombinations) {
             Set<ConstantLiteral> match = new HashSet<>(centerDataVertexLiterals);
-
-            // Convert match to literals and validate match size upfront
-            for (Vertex vertex : vertexList) {
+            for (Vertex vertex : combination) {
                 Map<String, Attribute> attributesMap = getAttributesMap(vertex);
                 addAttributesToMatch(vertex.getType(), attributesMap, vertexTypesToActiveAttributesMap.get(vertex.getType()), match);
             }
 
-            // Only consider matches that at least cover all pattern vertices once
-            if (match.size() > patternVertexSet.size()) {
+            if (match.size() > pattern.getPattern().vertexSet().size()) {
                 matchesAroundCenterVertex.add(match);
-                updateEntityURIs(centerDataVertex, matchesAroundCenterVertex, entityURIs, year);
+                updateEntityURIs(centerVertex, matchesAroundCenterVertex, ptnEntityURIs, timestamp);
             }
         }
     }

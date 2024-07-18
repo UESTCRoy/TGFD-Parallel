@@ -20,7 +20,6 @@ public class Vertex implements Serializable {
     private String type;
     private Set<Attribute> attributes;
     private boolean isMarked;
-//    private Set<Integer> jobletID;
 
     public Vertex(String uri, String type) {
         this.uri = uri;
@@ -58,33 +57,10 @@ public class Vertex implements Serializable {
         return true;
     }
 
-//    public boolean isMapped(Vertex other) {
-//        if (other == null) {
-//            return false;
-//        }
-//
-//        if (!this.uri.equals(other.uri) || !this.types.equals(other.types)) {
-//            return false;
-//        }
-//
-//        if (this.attributes.size() != other.attributes.size()) {
-//            return false;
-//        }
-//
-//        for (Attribute attr : this.attributes) {
-//            boolean found = false;
-//            for (Attribute otherAttr : other.attributes) {
-//                if (attr.getAttrName().equals(otherAttr.getAttrName()) && attr.getAttrValue().equals(otherAttr.getAttrValue())) {
-//                    found = true;
-//                    break;
-//                }
-//            }
-//            if (!found) {
-//                return false;
-//            }
-//        }
-//
-//        return true;
-//    }
-
+    @Override
+    public String toString() {
+        return "Vertex{" +
+                "type='" + type + '\'' +
+                '}';
+    }
 }

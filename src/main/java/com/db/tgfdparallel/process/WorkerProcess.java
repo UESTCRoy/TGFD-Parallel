@@ -74,6 +74,13 @@ public class WorkerProcess {
             logger.info("Load the {} split graph, graph edge size: {}, graph vertex size: {}",
                     i, loaders[i].getGraph().getGraph().edgeSet().size(), loaders[i].getGraph().getGraph().vertexSet().size());
         }
+        // Load the first snapshot
+//        String dataPath = dataShipperService.workerDataPreparation();
+//        GraphLoader initialLoader = graphService.loadFirstSnapshot(dataPath, vertexTypes);
+//        logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
+//                initialLoader.getGraph().getGraph().edgeSet().size(), initialLoader.getGraph().getGraph().vertexSet().size());
+//        // By using the change file, generate new loader for each snapshot
+//        GraphLoader[] loaders = processChangesAndLoadSubsequentSnapshots(initialLoader);
 
         // Initialize the matchesPerTimestampsByPTN and entityURIsByPTN
         initializePatternDataStructures(patternTreeNodes);
@@ -123,7 +130,12 @@ public class WorkerProcess {
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
-                    CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+                    int finalSuperstep = superstep;
+                    CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap)
+                            .exceptionally(ex -> {
+                                logger.error("Error processing snapshot " + finalSuperstep, ex);
+                                return null;
+                            });
                     futures.add(future);
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -131,7 +143,7 @@ public class WorkerProcess {
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
                         vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
-                logger.info("The pattern support for pattern: {} is {}", pattern, newPatternSupport);
+                logger.info("The pattern support for pattern: {} is {} and centerVertex is {}", pattern, newPatternSupport, centerVertexType);
                 newPattern.setPatternSupport(newPatternSupport);
                 if (newPatternSupport < config.getPatternTheta()) {
                     newPattern.setPruned(true);

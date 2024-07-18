@@ -254,8 +254,12 @@ public class PatternService {
                     continue;
                 }
 
-                // TODO: What this method does?
                 PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes, level);
+                VF2PatternGraph vfPattern = patternTreeNode.getPattern();
+                if (vfPattern.getPattern().vertexSet().size() > 2) {
+                    Vertex maxDegreeVertex = findMaxDegreeVertex(vfPattern);
+                    patternTreeNode.getPattern().setCenterVertex(maxDegreeVertex);
+                }
                 pattern.setOldPattern(ptn);
                 pattern.setNewPattern(patternTreeNode);
                 vSpawnPatternList.add(pattern);
@@ -528,6 +532,21 @@ public class PatternService {
             }
         }
         return true;
+    }
+
+    private Vertex findMaxDegreeVertex(VF2PatternGraph patternGraph) {
+        Graph<Vertex, RelationshipEdge> graph = patternGraph.getPattern();
+        Vertex centerVertex = patternGraph.getCenterVertex();
+        int maxDegree = graph.edgesOf(centerVertex).size();
+
+        for (Vertex vertex : graph.vertexSet()) {
+            int degree = graph.edgesOf(vertex).size();
+            if (degree > maxDegree) {
+                maxDegree = degree;
+                centerVertex = vertex;
+            }
+        }
+        return centerVertex;
     }
 
 }
