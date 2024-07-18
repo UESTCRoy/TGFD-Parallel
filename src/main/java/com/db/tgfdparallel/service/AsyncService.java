@@ -23,13 +23,16 @@ public class AsyncService {
     private final PatternService patternService;
     private final TGFDService tgfdService;
     private final DependencyService dependencyService;
+    private final FastMatchService fastMatchService;
 
     @Autowired
-    public AsyncService(GraphService graphService, PatternService patternService, TGFDService tgfdService, DependencyService dependencyService) {
+    public AsyncService(GraphService graphService, PatternService patternService, TGFDService tgfdService, DependencyService dependencyService,
+                        FastMatchService fastMatchService) {
         this.graphService = graphService;
         this.patternService = patternService;
         this.tgfdService = tgfdService;
         this.dependencyService = dependencyService;
+        this.fastMatchService = fastMatchService;
     }
 
     @Async
@@ -86,6 +89,35 @@ public class AsyncService {
                         }
 
                         matchesOnTimestamps.addAll(matches);
+                    }
+                });
+
+        return matchesOnTimestamps.size();
+    }
+
+    public int runFastMatchSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
+                                    Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
+                                    Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
+        Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
+        String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
+
+        Set<String> validTypes = newPattern.getPattern().getPattern().vertexSet().stream()
+                .map(Vertex::getType)
+                .filter(type -> !type.equals(centerVertexType))
+                .collect(Collectors.toSet());
+
+        PatternType patternType = patternService.assignPatternType(newPattern.getPattern());
+        logger.info("Pattern shape: {}", patternType);
+
+        graph.vertexSet().stream()
+                .filter(vertex -> vertex.getType().equals(centerVertexType) && entityURIs.containsKey(vertex.getUri()) && entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
+                .forEach(centerVertex -> {
+                    int diameter = (patternType == PatternType.Line || patternType == PatternType.Circle || patternType == PatternType.Complex) ? 2 : 1;
+                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, diameter, validTypes);
+                    Set<String> realGraphVertexTypes = subgraph.vertexSet().stream().map(Vertex::getType).collect(Collectors.toSet());
+                    if (realGraphVertexTypes.containsAll(validTypes)) {
+                        fastMatchService.findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(newPattern.getPattern(), subgraph, centerVertex, snapshotID,
+                                matchesOnTimestamps, ptnEntityURIs, vertexTypesToActiveAttributesMap);
                     }
                 });
 

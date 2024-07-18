@@ -17,7 +17,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class PatternService {
-
     private static final Logger logger = LoggerFactory.getLogger(PatternService.class);
     private final AppConfig config;
     private final GraphService graphService;
@@ -202,7 +201,6 @@ public class PatternService {
         List<VSpawnPattern> vSpawnPatternList = new ArrayList<>();
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
-        // TODO: Set pattern Pruned
         for (PatternTreeNode ptn : nodes) {
             if (ptn.isPruned()) {
                 continue;
@@ -255,8 +253,12 @@ public class PatternService {
                     continue;
                 }
 
-                // TODO: What this method does?
                 PatternTreeNode patternTreeNode = initializeNewNode(newPattern, ptn, edge, nodes, level);
+                VF2PatternGraph vfPattern = patternTreeNode.getPattern();
+                if (vfPattern.getPattern().vertexSet().size() > 2) {
+                    Vertex maxDegreeVertex = findMaxDegreeVertex(vfPattern);
+                    patternTreeNode.getPattern().setCenterVertex(maxDegreeVertex);
+                }
                 pattern.setOldPattern(ptn);
                 pattern.setNewPattern(patternTreeNode);
                 vSpawnPatternList.add(pattern);
@@ -461,7 +463,7 @@ public class PatternService {
                             .collect(Collectors.toSet());
 
                     if (newPatternEdges.containsAll(otherPatternEdges)) {
-                        System.out.println("Candidate pattern: " + newPattern + " is a supergraph of pruned subgraph pattern: " + treeNode.getPattern());
+                        logger.info("Candidate pattern: " + newPattern + " is a supergraph of pruned subgraph pattern: " + treeNode.getPattern());
                         return true;
                     }
                 }
@@ -477,6 +479,73 @@ public class PatternService {
         } else {
             logger.info("is a child of center vertex parent pattern: " + otherPatternNode.getPattern());
         }
+    }
+
+    private void setCenterNode() {
+
+    }
+
+    public PatternType assignPatternType(VF2PatternGraph pattern) {
+        Vertex centerVertex = pattern.getCenterVertex();
+        Graph<Vertex, RelationshipEdge> graph = pattern.getPattern();
+        int edgeCount = graph.edgeSet().size();
+
+        if (edgeCount == 0) {
+            return PatternType.SingleNode;
+        } else if (edgeCount == 1) {
+            return PatternType.SingleEdge;
+        } else if (edgeCount == 2) {
+            return PatternType.DoubleEdge;
+        } else {
+            int centerVertexEdges = graph.edgesOf(centerVertex).size();
+            if (centerVertexEdges == edgeCount) {
+                return PatternType.Star;
+            } else if (isLinePattern(graph)) {
+                return PatternType.Line;
+            } else if (isCirclePattern(graph)) {
+                return PatternType.Circle;
+            } else {
+                return PatternType.Complex;
+            }
+        }
+    }
+
+    private boolean isLinePattern(Graph<Vertex, RelationshipEdge> graph) {
+        long endpoints = 0;
+        long internalNodes = 0;
+        for (Vertex vertex : graph.vertexSet()) {
+            int degree = graph.edgesOf(vertex).size();
+            if (degree == 1) {
+                endpoints++;
+            } else if (degree == 2) {
+                internalNodes++;
+            }
+        }
+        return endpoints == 2 && internalNodes == graph.vertexSet().size() - 2;
+    }
+
+    private boolean isCirclePattern(Graph<Vertex, RelationshipEdge> graph) {
+        for (Vertex vertex : graph.vertexSet()) {
+            if (graph.edgesOf(vertex).size() != 2) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Vertex findMaxDegreeVertex(VF2PatternGraph patternGraph) {
+        Graph<Vertex, RelationshipEdge> graph = patternGraph.getPattern();
+        Vertex centerVertex = patternGraph.getCenterVertex();
+        int maxDegree = graph.edgesOf(centerVertex).size();
+
+        for (Vertex vertex : graph.vertexSet()) {
+            int degree = graph.edgesOf(vertex).size();
+            if (degree > maxDegree) {
+                maxDegree = degree;
+                centerVertex = vertex;
+            }
+        }
+        return centerVertex;
     }
 
 }

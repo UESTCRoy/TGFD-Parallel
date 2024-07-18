@@ -64,6 +64,7 @@ public class CoordinatorProcess {
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
         dataShipperService.sendHistogramData(histogramData);
+        printHistogram(histogramData);
 
         List<FrequencyStatistics> sortedVertexHistogram = histogramData.getSortedVertexHistogram();
         Set<String> vertexTypes = sortedVertexHistogram
@@ -142,6 +143,24 @@ public class CoordinatorProcess {
         logger.info("Check the status of the workers");
         activeMQService.initializeWorkersStatus();
         activeMQService.statusCheck();
+    }
+
+    private void printHistogram(ProcessedHistogramData histogramData) {
+        histogramData.getSortedVertexHistogram().forEach(vertex -> {
+            logger.info("Vertex Type: {}, Frequency: {}", vertex.getType(), vertex.getFrequency());
+        });
+        histogramData.getSortedFrequentEdgesHistogram().forEach(edge -> {
+            logger.info("Edge: {}", edge);
+        });
+        histogramData.getVertexTypesToActiveAttributesMap().forEach((key, value) -> {
+            logger.info("Vertex Type: {}, Active Attributes: {}", key, value);
+        });
+        Set<String> allAttributes = histogramData.getVertexTypesToActiveAttributesMap().values().stream()
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+        allAttributes.forEach(attribute -> {
+            logger.info("Attribute: {}", attribute);
+        });
     }
 
 }
