@@ -130,7 +130,7 @@ public class FastMatchService {
             }
         }
 
-        updateEntityURIs(centerVertex, matchesAroundCenterVertex, ptnEntityURIs, timestamp);
+//        updateEntityURIs(centerVertex, matchesAroundCenterVertex, ptnEntityURIs, timestamp);
     }
 
     private Map<String, Set<Vertex>> getPatternVertexToDataVerticesMap(VF2PatternGraph pattern, Graph<Vertex, RelationshipEdge> realGraph, Vertex centerVertex) {
@@ -189,12 +189,10 @@ public class FastMatchService {
         }
     }
 
-    private void updateEntityURIs(Vertex vertex, Set<Set<ConstantLiteral>> matches, Map<String, List<Integer>> entityURIs, int timestamp) {
-        if (!matches.isEmpty()) {
-            String entityURI = vertex.getUri();
-            List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
-            counts.set(timestamp, counts.get(timestamp) + 1);
-        }
+    private void updateEntityURIs(Vertex vertex, Map<String, List<Integer>> entityURIs, int timestamp) {
+        String entityURI = vertex.getUri();
+        List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
+        counts.set(timestamp, counts.get(timestamp) + 1);
     }
 
     // Star
@@ -219,7 +217,7 @@ public class FastMatchService {
 
             if (match.size() > pattern.getPattern().vertexSet().size()) { // Implement this method to check the validity of a match
                 matchesAroundCenterVertex.add(match);
-                updateEntityURIs(centerVertex, matchesAroundCenterVertex, ptnEntityURIs, timestamp);
+//                updateEntityURIs(centerVertex, matchesAroundCenterVertex, ptnEntityURIs, timestamp);
             }
         }
     }
@@ -257,7 +255,7 @@ public class FastMatchService {
 
             if (match.size() > pattern.getPattern().vertexSet().size()) {
                 matchesAroundCenterVertex.add(match);
-                updateEntityURIs(centerVertex, matchesAroundCenterVertex, ptnEntityURIs, timestamp);
+                updateEntityURIs(centerVertex, ptnEntityURIs, timestamp);
             }
         }
     }

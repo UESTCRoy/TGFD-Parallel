@@ -201,9 +201,8 @@ public class PatternService {
         List<VSpawnPattern> vSpawnPatternList = new ArrayList<>();
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
-        // TODO: Set pattern Pruned
         for (PatternTreeNode ptn : nodes) {
-            if (ptn.isPruned()) {
+            if (ptn.isPruned() && level < 4) {
                 continue;
             }
             for (String edge : edgeData) {
@@ -249,7 +248,7 @@ public class PatternService {
                     continue;
                 }
 
-                if (isSuperGraphOfPrunedPattern(newPattern, patternTree)) {
+                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 4) {
                     logger.info("Skip. Candidate pattern is a supergraph of pruned pattern");
                     continue;
                 }
