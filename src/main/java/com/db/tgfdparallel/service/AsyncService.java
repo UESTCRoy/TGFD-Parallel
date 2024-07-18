@@ -40,7 +40,7 @@ public class AsyncService {
                                                        Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
                                                        Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         long startTime = System.currentTimeMillis();
-        Integer result = runSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+        Integer result = runFastMatchSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
         long endTime = System.currentTimeMillis();
         logger.info("Async task for snapshot {} started and completed in {} ms, result: {}", snapshotID, (endTime - startTime), result);
         return CompletableFuture.completedFuture(result);

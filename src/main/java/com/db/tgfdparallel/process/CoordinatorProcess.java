@@ -112,6 +112,14 @@ public class CoordinatorProcess {
             activeMQService.closeProducer();
         }
 
+        // In case, hdfs hasn't ready yet
+//        try {
+//            Thread.sleep(60000);
+//        } catch (InterruptedException e) {
+//            logger.error("Thread was interrupted during sleep", e);
+//            Thread.currentThread().interrupt();
+//        }
+
         Map<Integer, Integer> dependencyMap = dataShipperService.downloadDependencyMap("dependency");
 
         // 处理Constant TGFD
