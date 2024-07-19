@@ -167,7 +167,8 @@ public class TGFDService {
     public double calculateTGFDSupport(double numerator, double S, int T) {
         double denominator = S * CombinatoricsUtils.binomialCoefficient(T + 1, 2);
         if (numerator > denominator) {
-            throw new IllegalArgumentException("numerator > denominator");
+            //            throw new IllegalArgumentException("numerator > denominator");
+            return 0.0;
         }
         return numerator / denominator;
     }

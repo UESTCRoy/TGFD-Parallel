@@ -124,7 +124,12 @@ public class WorkerProcess {
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
-                    CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+                    int finalSuperstep = superstep;
+                    CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap)
+                            .exceptionally(ex -> {
+                                logger.error("Error processing snapshot " + finalSuperstep, ex);
+                                return null;
+                            });
                     futures.add(future);
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -132,7 +137,7 @@ public class WorkerProcess {
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
                         vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
-                logger.info("The pattern support for pattern: {} is {}", pattern, newPatternSupport);
+                logger.info("The pattern support for pattern: {} is {} and centerVertex is {}", pattern, newPatternSupport, centerVertexType);
                 newPattern.setPatternSupport(newPatternSupport);
                 if (newPatternSupport < config.getPatternTheta()) {
                     newPattern.setPruned(true);

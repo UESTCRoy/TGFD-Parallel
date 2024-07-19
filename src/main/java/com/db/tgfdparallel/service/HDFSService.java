@@ -29,10 +29,18 @@ public class HDFSService {
     }
 
     public void uploadObject(String directoryName, String fileName, Object obj) {
+        if (directoryName == null || fileName == null || obj == null) {
+            logger.error("Invalid input parameters. Directory name, file name, and object must not be null.");
+            return;
+        }
+
         FileSystem fs = null;
         try {
             byte[] data = serializeObject(obj);
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(data);
+            if (data == null || data.length == 0) {
+                logger.error("Serialization failed or serialized object is empty.");
+                return;
+            }
 
             fs = FileSystem.get(conf);
 
@@ -43,7 +51,12 @@ public class HDFSService {
             }
 
             Path filePath = new Path(directoryPath, fileName);
-            try (FSDataOutputStream out = fs.create(filePath, true)) {
+            if (fs.exists(filePath)) {
+                logger.info("File {} already exists. It will be overwritten.", filePath);
+            }
+
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(data);
+                 FSDataOutputStream out = fs.create(filePath, true)) {
                 byte[] buffer = new byte[1024];
                 int bytesRead;
                 while ((bytesRead = inputStream.read(buffer)) > 0) {
@@ -52,7 +65,7 @@ public class HDFSService {
                 logger.info("Successfully uploaded to {}", filePath);
             }
         } catch (IOException e) {
-            logger.error("Failed to upload object to {}/{} due to {}", directoryName, fileName, e.getMessage(), e);
+            logger.error("Failed to upload object to {}/{}.", directoryName, fileName, e);
         } finally {
             if (fs != null) {
                 try {
@@ -69,20 +82,32 @@ public class HDFSService {
         try {
             FileSystem fileSystem = FileSystem.get(conf);
 
-            FSDataInputStream inputStream = fileSystem.open(new Path(directoryName, fileName));
-            try (ObjectInputStream in = new ObjectInputStream(inputStream)) {
-                obj = in.readObject();
-            } catch (IOException e) {
-                logger.error("Error while reading the object from HDFS: " + e.getMessage());
-                return null;
-            } catch (ClassNotFoundException e) {
-                logger.error("Error while deserializing the object from HDFS: " + e.getMessage());
+            Path filePath = new Path(directoryName, fileName);
+            if (!fileSystem.exists(filePath)) {
+                logger.error("File does not exist: {}/{}", directoryName, fileName);
                 return null;
             }
 
-            inputStream.close();
+            logger.info("File exists, attempting to open: {}/{}", directoryName, fileName);
+
+            FSDataInputStream inputStream = fileSystem.open(filePath);
+            logger.info("Successfully opened the file: {}/{}", directoryName, fileName);
+            try (ObjectInputStream in = new ObjectInputStream(inputStream)) {
+                obj = in.readObject();
+                logger.info("Object has been successfully deserialized");
+            } catch (IOException e) {
+                logger.error("Error while reading the object from HDFS", e);
+                return null;
+            } catch (ClassNotFoundException e) {
+                logger.error("Error while deserializing the object from HDFS", e);
+                return null;
+            } finally {
+                inputStream.close();
+                logger.info("Input stream closed");
+            }
+
         } catch (IOException e) {
-            logger.error("Error while accessing HDFS: " + e.getMessage());
+            logger.error("Error while accessing HDFS", e);
             return null;
         }
         return obj;
@@ -136,4 +161,3 @@ public class HDFSService {
     }
 
 }
-
