@@ -144,9 +144,8 @@ public class WorkerProcess {
                 matchesPerTimestampsByPTN.put(newPattern, matchesPerTimestamps);
 
                 // 计算新pattern的HSpawn
-                CompletableFuture<List<List<TGFD>>> futureTGFDs = hSpawnService.performHSPawn(
+                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(
                         vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps, dependencyNumberMap);
-                List<List<TGFD>> tgfds = futureTGFDs.join();
 
                 if (tgfds.size() == 2 && level > 1) {
                     constantTGFDs.addAll(tgfds.get(0));
