@@ -25,8 +25,8 @@ public class HSpawnService {
         this.asyncService = asyncService;
     }
 
-    public CompletableFuture<List<List<TGFD>>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
-                                                             List<Set<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
+    public List<List<TGFD>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
+                                          List<Set<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
         Graph<Vertex, RelationshipEdge> graph = patternTreeNode.getPattern().getPattern();
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));
         int hSpawnLimit = graph.vertexSet().size();
@@ -35,21 +35,17 @@ public class HSpawnService {
         List<AttributeDependency> allMinimalDependenciesOnThisPath = patternService.getAllMinimalDependenciesOnThisPath(patternTreeNode);
         newPaths.removeIf(newPath -> dependencyService.isSuperSetOfPath(newPath, allMinimalDependenciesOnThisPath));
 
-        List<CompletableFuture<List<List<TGFD>>>> futures = newPaths.stream()
-                .map(newPath -> asyncService.findTGFDsAsync(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap))
-                .collect(Collectors.toList());
 
-        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .thenApply(v -> {
-                    List<List<TGFD>> combinedResult = new ArrayList<>();
-                    combinedResult.add(new ArrayList<>()); // constant TGFDs
-                    combinedResult.add(new ArrayList<>()); // general TGFDs
-                    futures.forEach(future -> {
-                        List<List<TGFD>> res = future.join();
-                        combinedResult.get(0).addAll(res.get(0));
-                        combinedResult.get(1).addAll(res.get(1));
-                    });
-                    return combinedResult;
-                });
+        List<List<TGFD>> combinedResult = new ArrayList<>();
+        combinedResult.add(new ArrayList<>()); // constant TGFDs
+        combinedResult.add(new ArrayList<>()); // general TGFDs
+
+        for (AttributeDependency newPath : newPaths) {
+            List<List<TGFD>> res = asyncService.findTGFDs(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap);
+            combinedResult.get(0).addAll(res.get(0));
+            combinedResult.get(1).addAll(res.get(1));
+        }
+
+        return combinedResult;
     }
 }
