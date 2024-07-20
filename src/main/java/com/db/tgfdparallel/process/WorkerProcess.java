@@ -129,7 +129,10 @@ public class WorkerProcess {
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
-                    int match = asyncService.runSnapshot(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+                    long findMatchesStartTime = System.currentTimeMillis();
+                    int matches = asyncService.runSnapshot(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+                    long findMatchesEndTime = System.currentTimeMillis();
+                    logger.info("Snapshot {}: Found {} matches in {} ms", superstep, matches, findMatchesEndTime - findMatchesStartTime);
                 }
 
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
