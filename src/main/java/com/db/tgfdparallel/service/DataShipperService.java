@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -410,23 +411,28 @@ public class DataShipperService {
         return changesData;
     }
 
-    public void awsCoordinatorDataPreparation(List<String> allDataPath, List<String> splitGraphPath, String changeFilePath) {
+    public void awsCoordinatorDataPreparation(List<String> allDataPath, String changeFilePath) {
         logger.info("Downloading Graph Information From S3");
+        long startTime = System.currentTimeMillis();
         // Process allDataPath
         processPaths(allDataPath, "/home/ec2-user/completeGraph/");
         // Process splitGraphPath
-        processPaths(splitGraphPath, "/home/ec2-user/splitGraph/");
+//        processPaths(splitGraphPath, "/home/ec2-user/splitGraph/");
         // Handle changeFile (download entire directory)
         s3Service.downloadObjectsToInstanceDirectory(changeFilePath);
-        logger.info("Finish Download From S3 to Instance");
+        long endTime = System.currentTimeMillis();
+        logger.info("Finish Download From S3 to Instance in {} seconds", TimeUnit.MILLISECONDS.toSeconds(endTime - startTime));
     }
 
     public String workerDataPreparation() {
         String dataPath = config.getDataPath();
         if (isAmazonMode()) {
+            long startTime = System.currentTimeMillis();
             String fileName = getFileNameFromPath(dataPath);
             String destinationFile = "/home/ec2-user/dataPath/" + fileName;
             s3Service.downloadFileToInstance(dataPath, destinationFile);
+            long endTime = System.currentTimeMillis();
+            logger.info("Finish Download From S3 to Instance in {} seconds", TimeUnit.MILLISECONDS.toSeconds(endTime - startTime));
             return destinationFile;
         } else {
             return dataPath;

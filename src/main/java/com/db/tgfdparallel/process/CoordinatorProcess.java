@@ -55,7 +55,7 @@ public class CoordinatorProcess {
         // AWS Data Preparation
         if (dataShipperService.isAmazonMode()) {
             changeFilePath = "/home/ec2-user/changeFile";
-//            dataShipperService.awsCoordinatorDataPreparation(allDataPath, splitGraphPath, changeFilePath);
+            dataShipperService.awsCoordinatorDataPreparation(Stream.of(firstGraphPath).collect(Collectors.toList()), changeFilePath);
         }
 
         // Generate histogram and send the histogram data to all workers
