@@ -185,6 +185,7 @@ public class PatternService {
             int numberOfWithinMatchesOfEntity = (int) entityUriEntry.getValue().stream().filter(x -> x > 1).count();
             numOfPossiblePairs += numberOfWithinMatchesOfEntity;
         }
+        // TODO: multiple 4(number of workers) or 16(number of workers * number of workers) to the denominator
         return calculateSupport(numOfPossiblePairs, S, T);
     }
 
@@ -202,7 +203,7 @@ public class PatternService {
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
         for (PatternTreeNode ptn : nodes) {
-            if (ptn.isPruned() && level < 4) {
+            if (ptn.isPruned() && level < 3) {
                 continue;
             }
             for (String edge : edgeData) {
@@ -248,7 +249,7 @@ public class PatternService {
                     continue;
                 }
 
-                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 4) {
+                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 3) {
                     logger.info("Skip. Candidate pattern is a supergraph of pruned pattern");
                     continue;
                 }

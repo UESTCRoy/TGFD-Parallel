@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 @Service
 public class HSpawnService {
@@ -34,7 +32,6 @@ public class HSpawnService {
         List<AttributeDependency> newPaths = dependencyService.generateAllPaths(activeAttributesInPattern, hSpawnLimit);
         List<AttributeDependency> allMinimalDependenciesOnThisPath = patternService.getAllMinimalDependenciesOnThisPath(patternTreeNode);
         newPaths.removeIf(newPath -> dependencyService.isSuperSetOfPath(newPath, allMinimalDependenciesOnThisPath));
-
 
         List<List<TGFD>> combinedResult = new ArrayList<>();
         combinedResult.add(new ArrayList<>()); // constant TGFDs

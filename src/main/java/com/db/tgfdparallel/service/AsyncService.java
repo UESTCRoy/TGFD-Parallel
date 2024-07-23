@@ -57,14 +57,17 @@ public class AsyncService {
                 .map(Vertex::getType)
                 .collect(Collectors.toSet());
 
-        final int finalLevel = level;
+        PatternType patternType = patternService.assignPatternType(newPattern.getPattern());
+        logger.info("Pattern shape: {}", patternType);
+
         graph.vertexSet().stream()
                 .filter(vertex -> vertex.getType().equals(centerVertexType))
                 .filter(vertex -> entityURIs.containsKey(vertex.getUri()))
                 .filter(vertex -> entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
                     long subGraphStartTime = System.currentTimeMillis();
-                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, finalLevel, validTypes);
+                    int diameter = (patternType == PatternType.Line || patternType == PatternType.Circle || patternType == PatternType.Complex) ? 2 : 1;
+                    Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, diameter, validTypes);
                     long subGraphEndTime = System.currentTimeMillis();
                     long subGraphDuration = subGraphEndTime - subGraphStartTime;
                     if (subGraphDuration > 10000) {
