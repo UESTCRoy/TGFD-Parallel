@@ -69,6 +69,7 @@ public class WorkerProcess {
 
         // Load the first snapshot
         String dataPath = dataShipperService.workerDataPreparation();
+        logger.info("Data Path is {}", dataPath);
         GraphLoader initialLoader = graphService.loadFirstSnapshot(dataPath, vertexTypes);
         logger.info("Load the first split graph, graph edge size: {}, graph vertex size: {}",
                 initialLoader.getGraph().getGraph().edgeSet().size(), initialLoader.getGraph().getGraph().vertexSet().size());
