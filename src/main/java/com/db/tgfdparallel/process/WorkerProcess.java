@@ -134,9 +134,10 @@ public class WorkerProcess {
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
+                int numberOfWorker = config.getWorkers().size();
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
-                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
+                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp()) * numberOfWorker;
                 logger.info("The pattern support for pattern: {} is {} and centerVertex is {}", pattern, newPatternSupport, centerVertexType);
                 newPattern.setPatternSupport(newPatternSupport);
                 if (newPatternSupport < config.getPatternTheta()) {
