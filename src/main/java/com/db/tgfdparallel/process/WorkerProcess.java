@@ -130,7 +130,7 @@ public class WorkerProcess {
                     GraphLoader loader = loaders[superstep];
                     Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
                     long findMatchesStartTime = System.currentTimeMillis();
-                    int matches = asyncService.runSnapshot(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
+                    int matches = asyncService.runFastMatchSnapshot(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
                     long findMatchesEndTime = System.currentTimeMillis();
                     logger.info("Snapshot {}: Found {} matches in {} ms", superstep, matches, findMatchesEndTime - findMatchesStartTime);
                 }
