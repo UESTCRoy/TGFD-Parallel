@@ -1,0 +1,11 @@
+1. 1m_IMDB
+Coordinator:
+    nohup java -Xms120g -Xmx120g -Dspring.profiles.active=aws -jar tgfd-parallel.jar --nodeName=coordinator --dataset=imdb --timestamp=16 --firstGraphPath=imdb/completeGraph/1m_imdb/imdb-170909.nt --changeFilePath=imdb/changeFile/1m_change --k=4 --frequentEdges=10 --patternTheta=0.00008 --tgfdTheta=0.00008 --workers=zurich,geneva,tokyo,salzburg --vpcNumber=1 --activemq.brokerUrl=ssl://b-a17dba85-1d51-4a08-8ac3-07ec3fb740e6-1.mq.us-east-2.amazonaws.com:61617 --instanceID=i-0747a895664e7d21b
+Zurich:
+    nohup java -Xms120g -Xmx120g -Dspring.profiles.active=aws -jar tgfd-parallel.jar --nodeName=zurich --dataset=imdb --timestamp=16 --dataPath=imdb/splitGraph/1m_imdb_split4/1m_1/imdb0-170909.nt --k=4 --frequentEdges=10 --patternTheta=0.00008 --tgfdTheta=0.00008 --workers=zurich,geneva,tokyo,salzburg --vpcNumber=1 --activemq.brokerUrl=ssl://b-a17dba85-1d51-4a08-8ac3-07ec3fb740e6-1.mq.us-east-2.amazonaws.com:61617 --instanceID=i-0d452007e82117cb1
+Geneva:
+    nohup java -Xms120g -Xmx120g -Dspring.profiles.active=aws -jar tgfd-parallel.jar --nodeName=geneva --dataset=imdb --timestamp=16 --dataPath=imdb/splitGraph/1m_imdb_split4/1m_2/imdb1-170909.nt --k=4 --frequentEdges=10 --patternTheta=0.00008 --tgfdTheta=0.00008 --workers=zurich,geneva,tokyo,salzburg --vpcNumber=1 --activemq.brokerUrl=ssl://b-a17dba85-1d51-4a08-8ac3-07ec3fb740e6-1.mq.us-east-2.amazonaws.com:61617 --instanceID=i-0d9a18755d0761d78
+Tokyo:
+    nohup java -Xms120g -Xmx120g -Dspring.profiles.active=aws -jar tgfd-parallel.jar --nodeName=tokyo --dataset=imdb --timestamp=16 --dataPath=imdb/splitGraph/1m_imdb_split4/1m_3/imdb2-170909.nt --k=4 --frequentEdges=10 --patternTheta=0.00008 --tgfdTheta=0.00008 --workers=zurich,geneva,tokyo,salzburg --vpcNumber=1 --activemq.brokerUrl=ssl://b-a17dba85-1d51-4a08-8ac3-07ec3fb740e6-1.mq.us-east-2.amazonaws.com:61617 --instanceID=i-0c702ae1a618317bf
+Salzburg:
+    nohup java -Xms120g -Xmx120g -Dspring.profiles.active=aws -jar tgfd-parallel.jar --nodeName=salzburg --dataset=imdb --timestamp=16 --dataPath=imdb/splitGraph/1m_imdb_split4/1m_4/imdb3-170909.nt --k=4 --frequentEdges=10 --patternTheta=0.00008 --tgfdTheta=0.00008 --workers=zurich,geneva,tokyo,salzburg --vpcNumber=1 --activemq.brokerUrl=ssl://b-a17dba85-1d51-4a08-8ac3-07ec3fb740e6-1.mq.us-east-2.amazonaws.com:61617 --instanceID=i-073594a1c845d62b9

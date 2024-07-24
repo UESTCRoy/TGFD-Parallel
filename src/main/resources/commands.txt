@@ -1,6 +1,6 @@
 1. 1m_IMDB
 Coordinator:
-    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=12 --firstGraphPath=/home/wang851/data/imdb/completeGraph/1m_imdb/imdb-170909.nt --changeFilePath=/home/wang851/data/imdb/changeFile/1m_change
+    nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=coordinator --timestamp=16 --firstGraphPath=/home/wang851/data/imdb/completeGraph/1m_imdb/imdb-170909.nt --changeFilePath=/home/wang851/data/imdb/changeFile/1m_change
 Zurich:
     nohup java -Xms210g -Xmx210g -Dspring.profiles.active=local -jar tgfd-parallel.jar --nodeName=zurich --timestamp=16 --dataPath=/home/wang851/data/imdb/splitGraph/1m_imdb_split4/1m_1/imdb0-170909.nt
 Geneva:

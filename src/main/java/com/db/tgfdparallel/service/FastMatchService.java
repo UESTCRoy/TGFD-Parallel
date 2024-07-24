@@ -189,10 +189,10 @@ public class FastMatchService {
         }
     }
 
-    private void updateEntityURIs(Vertex vertex, Map<String, List<Integer>> entityURIs, int timestamp) {
+    private void updateEntityURIs(Vertex vertex, Map<String, List<Integer>> entityURIs, int timestamp, int matchCount) {
         String entityURI = vertex.getUri();
         List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
-        counts.set(timestamp, counts.get(timestamp) + 1);
+        counts.set(timestamp, counts.get(timestamp) + matchCount);
     }
 
     // Star
@@ -255,7 +255,7 @@ public class FastMatchService {
 
             if (match.size() > pattern.getPattern().vertexSet().size()) {
                 matchesAroundCenterVertex.add(match);
-                updateEntityURIs(centerVertex, ptnEntityURIs, timestamp);
+                updateEntityURIs(centerVertex, ptnEntityURIs, timestamp, match.size());
             }
         }
     }
