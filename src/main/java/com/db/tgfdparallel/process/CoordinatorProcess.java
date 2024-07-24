@@ -133,12 +133,6 @@ public class CoordinatorProcess {
 
         FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
         FileUtil.saveConstantTGFDsToFile(generalTGFDMap, "General-TGFD");
-        if (dataShipperService.isAmazonMode()) {
-            s3Service.stopInstance();
-        }
-//        if (dataShipperService.isAmazonMode()) {
-//
-//        }
 
         long endTime = System.currentTimeMillis();
         long durationMillis = endTime - startTime;
@@ -146,6 +140,10 @@ public class CoordinatorProcess {
         long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The coordinator process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
+
+//        if (dataShipperService.isAmazonMode()) {
+//            s3Service.stopInstance();
+//        }
     }
 
     private void initializeWorkers() {

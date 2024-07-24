@@ -180,9 +180,6 @@ public class WorkerProcess {
         logger.info("Send {} constant and {} general TGFDs to Coordinator", constantTGFDs.size(), generalTGFDs.size());
         dataShipperService.uploadTGFD(dependencyNumberMap, constantTGFDMap, generalTGFDMap);
         logger.info(config.getNodeName() + " Done");
-        if (dataShipperService.isAmazonMode()) {
-            s3Service.stopInstance();
-        }
 
         long endTime = System.currentTimeMillis();
         long durationMillis = endTime - startTime;
@@ -190,6 +187,10 @@ public class WorkerProcess {
         long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
+
+//        if (dataShipperService.isAmazonMode()) {
+//            s3Service.stopInstance();
+//        }
     }
 
     private ProcessedHistogramData receiveAndProcessHistogramData() {
