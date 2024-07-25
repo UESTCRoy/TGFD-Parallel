@@ -188,9 +188,9 @@ public class WorkerProcess {
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
 
-//        if (dataShipperService.isAmazonMode()) {
-//            s3Service.stopInstance();
-//        }
+        if (dataShipperService.isAmazonMode()) {
+            s3Service.stopInstance();
+        }
     }
 
     private ProcessedHistogramData receiveAndProcessHistogramData() {
