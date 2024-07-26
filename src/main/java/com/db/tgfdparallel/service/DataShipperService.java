@@ -340,7 +340,18 @@ public class DataShipperService {
             List<String> TGFDsFile = activeMQService.receiveTGFDsFromWorker(type);
             for (String fileName : TGFDsFile) {
                 logger.info("Downloading {} TGFDs from {}", type, fileName);
-                Map<Integer, Integer> data = (Map<Integer, Integer>) downloadObject(fileName);
+                Map<Integer, Integer> data = null;
+                try {
+                    data = (Map<Integer, Integer>) downloadObject(fileName);
+                } catch (ClassCastException e) {
+                    logger.error("Error while casting downloaded object from {} to Map<Integer, Integer>: {}", fileName, e.getMessage(), e);
+                }
+
+                if (data == null) {
+                    logger.warn("Downloaded object from {} is null or not a Map<Integer, Integer>", fileName);
+                    continue;
+                }
+
                 logger.info("Got {} {} TGFDs from {}", data.size(), type, fileName);
                 for (Map.Entry<Integer, Integer> entry : data.entrySet()) {
                     obj.merge(entry.getKey(), entry.getValue(), Integer::sum);
