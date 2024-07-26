@@ -101,7 +101,7 @@ public class PatternService {
 //                numOfMatches++;
                 if (entityURI != null) {
                     List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
-                    counts.set(timestamp, counts.get(timestamp) + 1);
+                    counts.set(timestamp, counts.get(timestamp) + literalsInMatch.size());
                 }
                 matches.add(literalsInMatch);
             }
