@@ -68,6 +68,7 @@ public class WorkerProcess {
         List<PatternTreeNode> patternTreeNodes = receivePatternTreeNodes();
 
         List<String> allDataPaths = dataShipperService.workerDBPediaPreparation();
+        logger.info("Data Path is {}", allDataPaths);
         GraphLoader[] loaders = new GraphLoader[allDataPaths.size()];
         for (int i = 0; i < allDataPaths.size(); i++) {
             loaders[i] = graphService.loadFirstSnapshot(allDataPaths.get(i), vertexTypes);
@@ -140,9 +141,10 @@ public class WorkerProcess {
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
+                int numberOfWorker = config.getWorkers().size();
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
-                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
+                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp()) * numberOfWorker;
                 logger.info("The pattern support for pattern: {} is {} and centerVertex is {}", pattern, newPatternSupport, centerVertexType);
                 newPattern.setPatternSupport(newPatternSupport);
                 if (newPatternSupport < config.getPatternTheta()) {
@@ -184,9 +186,6 @@ public class WorkerProcess {
         logger.info("Send {} constant and {} general TGFDs to Coordinator", constantTGFDs.size(), generalTGFDs.size());
         dataShipperService.uploadTGFD(dependencyNumberMap, constantTGFDMap, generalTGFDMap);
         logger.info(config.getNodeName() + " Done");
-        if (dataShipperService.isAmazonMode()) {
-            s3Service.stopInstance();
-        }
 
         long endTime = System.currentTimeMillis();
         long durationMillis = endTime - startTime;
@@ -194,6 +193,10 @@ public class WorkerProcess {
         long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
+
+        if (dataShipperService.isAmazonMode()) {
+            s3Service.stopInstance();
+        }
     }
 
     private ProcessedHistogramData receiveAndProcessHistogramData() {
