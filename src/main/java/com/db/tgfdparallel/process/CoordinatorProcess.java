@@ -135,15 +135,25 @@ public class CoordinatorProcess {
         histogramData.getSortedFrequentEdgesHistogram().forEach(edge -> {
             logger.info("Edge: {}", edge);
         });
-        histogramData.getVertexTypesToActiveAttributesMap().forEach((key, value) -> {
+
+        Set<String> frequentVertexType = histogramData.getSortedVertexHistogram().stream()
+                .map(FrequencyStatistics::getType)
+                .collect(Collectors.toSet());
+
+        Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
+        Map<String, Set<String>> filteredVertexTypesToActiveAttributesMap = vertexTypesToActiveAttributesMap.entrySet().stream()
+                .filter(entry -> frequentVertexType.contains(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        filteredVertexTypesToActiveAttributesMap.forEach((key, value) -> {
             logger.info("Vertex Type: {}, Active Attributes: {}", key, value);
         });
-        Set<String> allAttributes = histogramData.getVertexTypesToActiveAttributesMap().values().stream()
+        histogramData.getVertexTypesToActiveAttributesMap().values().stream()
                 .flatMap(Set::stream)
-                .collect(Collectors.toSet());
-        allAttributes.forEach(attribute -> {
-            logger.info("Attribute: {}", attribute);
-        });
+                .distinct()
+                .forEach(attribute -> {
+                    logger.info("Attribute: {}", attribute);
+                });
     }
 
 }
