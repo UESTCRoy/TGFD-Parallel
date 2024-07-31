@@ -202,7 +202,8 @@ public class PatternService {
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
         for (PatternTreeNode ptn : nodes) {
-            if (ptn.isPruned() && level < 4) {
+//            if (ptn.isPruned() && level < 2) {
+            if (ptn.isPruned()) {
                 continue;
             }
             for (String edge : edgeData) {
@@ -248,7 +249,8 @@ public class PatternService {
                     continue;
                 }
 
-                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 4) {
+//                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 2) {
+                if (isSuperGraphOfPrunedPattern(newPattern, patternTree)) {
                     logger.info("Skip. Candidate pattern is a supergraph of pruned pattern");
                     continue;
                 }

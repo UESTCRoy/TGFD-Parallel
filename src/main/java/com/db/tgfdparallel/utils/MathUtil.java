@@ -28,13 +28,13 @@ public class MathUtil {
         return (int) (positiveCount * (positiveCount - 1) / 2);
     }
 
-    public static <T> Set<List<T>> cartesianProduct(List<Set<T>> sets) {
-        Set<List<T>> result = new HashSet<>();
+    public static <T> List<List<T>> cartesianProduct(List<Set<T>> sets) {
+        List<List<T>> result = new ArrayList<>();
         cartesianProduct(0, new ArrayList<>(), sets, result);
         return result;
     }
 
-    private static  <T> void cartesianProduct(int index, List<T> current, List<Set<T>> sets, Set<List<T>> result) {
+    private static <T> void cartesianProduct(int index, List<T> current, List<Set<T>> sets, List<List<T>> result) {
         if (index == sets.size()) {
             result.add(new ArrayList<>(current));
             return;

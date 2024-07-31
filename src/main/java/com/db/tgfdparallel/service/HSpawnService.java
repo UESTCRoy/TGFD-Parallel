@@ -26,7 +26,7 @@ public class HSpawnService {
     }
 
     public CompletableFuture<List<List<TGFD>>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
-                                                             List<Set<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
+                                                             List<List<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
         Graph<Vertex, RelationshipEdge> graph = patternTreeNode.getPattern().getPattern();
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));
         int hSpawnLimit = graph.vertexSet().size();

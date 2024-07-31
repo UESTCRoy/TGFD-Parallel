@@ -4,6 +4,7 @@ import com.db.tgfdparallel.config.AppConfig;
 import com.db.tgfdparallel.domain.*;
 import com.db.tgfdparallel.service.*;
 import com.db.tgfdparallel.utils.DeepCopyUtil;
+import com.db.tgfdparallel.utils.FileUtil;
 import org.jgrapht.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +45,7 @@ public class WorkerProcess {
         this.asyncService = asyncService;
     }
 
-    private Map<PatternTreeNode, List<Set<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN;
+    private Map<PatternTreeNode, List<List<Set<ConstantLiteral>>>> matchesPerTimestampsByPTN;
     private Map<String, Map<String, List<Integer>>> entityURIsByPTN; // first key: centerVertexType, second key: entityURI
     private Map<Integer, Integer> dependencyNumberMap = new HashMap<>();
 
@@ -119,7 +120,7 @@ public class WorkerProcess {
             for (VSpawnPattern vSpawnedPatterns : vSpawnPatternList) {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
-                List<Set<Set<ConstantLiteral>>> matchesPerTimestamps = new ArrayList<>(Collections.nCopies(config.getTimestamp(), new HashSet<>()));
+                List<List<Set<ConstantLiteral>>> matchesPerTimestamps = new ArrayList<>(Collections.nCopies(config.getTimestamp(), new ArrayList<>()));
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
                 String centerVertexType = newPattern.getPattern().getCenterVertexType();
@@ -130,7 +131,7 @@ public class WorkerProcess {
                 List<CompletableFuture<Integer>> futures = new ArrayList<>();
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
-                    Set<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
+                    List<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
                     int finalSuperstep = superstep;
                     CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap)
                             .exceptionally(ex -> {
@@ -145,11 +146,17 @@ public class WorkerProcess {
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
                         vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp()) * numberOfWorker;
+//                double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
+//                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
+
                 logger.info("The pattern support for pattern: {} is {} and centerVertex is {}", pattern, newPatternSupport, centerVertexType);
                 newPattern.setPatternSupport(newPatternSupport);
                 if (newPatternSupport < config.getPatternTheta()) {
                     newPattern.setPruned(true);
                     logger.info("The pattern: {} didn't pass the support threshold", pattern);
+                    continue;
+                }
+                if (level == 1) {
                     continue;
                 }
                 matchesPerTimestampsByPTN.put(newPattern, matchesPerTimestamps);
@@ -193,6 +200,7 @@ public class WorkerProcess {
         long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
+        FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
 
         if (dataShipperService.isAmazonMode()) {
             s3Service.stopInstance();
@@ -239,7 +247,7 @@ public class WorkerProcess {
         for (PatternTreeNode ptn : patternTreeNodes) {
             String centerVertexType = ptn.getPattern().getCenterVertexType();
             matchesPerTimestampsByPTN.computeIfAbsent(ptn, k -> IntStream.range(0, config.getTimestamp())
-                    .mapToObj(timestamp -> new HashSet<Set<ConstantLiteral>>())
+                    .mapToObj(timestamp -> new ArrayList<Set<ConstantLiteral>>())
                     .collect(Collectors.toList()));
             entityURIsByPTN.put(centerVertexType, new HashMap<>());
         }

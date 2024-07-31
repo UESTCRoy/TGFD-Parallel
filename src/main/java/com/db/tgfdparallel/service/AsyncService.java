@@ -37,7 +37,7 @@ public class AsyncService {
 
     @Async
     public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
-                                                       Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
+                                                       List<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
                                                        Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         long startTime = System.currentTimeMillis();
         Integer result = runFastMatchSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
@@ -97,7 +97,7 @@ public class AsyncService {
     }
 
     public int runFastMatchSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
-                                    Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
+                                    List<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
                                     Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
@@ -127,7 +127,7 @@ public class AsyncService {
 
     @Async
     public CompletableFuture<List<List<TGFD>>> findTGFDsAsync(PatternTreeNode patternTreeNode, AttributeDependency newPath,
-                                                              List<Set<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
+                                                              List<List<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
         long startTime = System.currentTimeMillis();
         List<List<TGFD>> result = findTGFDs(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap);
         long endTime = System.currentTimeMillis();
@@ -135,7 +135,7 @@ public class AsyncService {
         return CompletableFuture.completedFuture(result);
     }
 
-    public List<List<TGFD>> findTGFDs(PatternTreeNode patternTreeNode, AttributeDependency newPath, List<Set<Set<ConstantLiteral>>> matchesPerTimestamps,
+    public List<List<TGFD>> findTGFDs(PatternTreeNode patternTreeNode, AttributeDependency newPath, List<List<Set<ConstantLiteral>>> matchesPerTimestamps,
                                       Map<Integer, Integer> dependencyNumberMap) {
         List<List<TGFD>> result = new ArrayList<>();
         result.add(new ArrayList<>());
