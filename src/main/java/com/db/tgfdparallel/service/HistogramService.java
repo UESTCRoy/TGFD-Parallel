@@ -77,12 +77,15 @@ public class HistogramService {
             }
         }
 
+        Set<String> unwantedAttributes = new HashSet<>(Arrays.asList("lccnid", "viafid", "individualisedgnd"));
+
         for (Map.Entry<String, Map<String, Integer>> entry : attrFrequencyMap.entrySet()) {
             String vertexType = entry.getKey();
             Map<String, Integer> frequencyMap = entry.getValue();
 
             List<String> topAttributes = frequencyMap.entrySet().stream()
                     .filter(e -> e.getValue() > 1000)
+                    .filter(e -> !unwantedAttributes.contains(e.getKey()))
                     .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
 //                    .limit(6)
                     .map(Map.Entry::getKey)

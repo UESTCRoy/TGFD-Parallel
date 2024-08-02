@@ -123,7 +123,7 @@ public class WorkerProcess {
                 List<List<Set<ConstantLiteral>>> matchesPerTimestamps = new ArrayList<>(Collections.nCopies(config.getTimestamp(), new ArrayList<>()));
                 logger.info("Finding TGFDs at level {} for pattern {}", level, pattern);
 
-                String centerVertexType = newPattern.getPattern().getCenterVertexType();
+                String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
                 Map<String, List<Integer>> entityURIs = entityURIsByPTN.get(centerVertexType);
                 // For Support Computing
                 Map<String, List<Integer>> ptnEntityURIs = new ConcurrentHashMap<>();
@@ -145,7 +145,7 @@ public class WorkerProcess {
                 int numberOfWorker = config.getWorkers().size();
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
                 double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
-                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp()) * numberOfWorker;
+                        vertexHistogram.get(newPattern.getPattern().getCenterVertex().getType()), config.getTimestamp()) * numberOfWorker;
 //                double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
 //                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
 
@@ -156,6 +156,12 @@ public class WorkerProcess {
                     logger.info("The pattern: {} didn't pass the support threshold", pattern);
                     continue;
                 }
+                // For Vary K purpose
+//                if (newPatternSupport == 0) {
+//                    newPattern.setPruned(true);
+//                    logger.info("The pattern: {} didn't pass the support threshold", pattern);
+//                    continue;
+//                }
                 if (level == 1) {
                     continue;
                 }

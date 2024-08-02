@@ -32,6 +32,7 @@ public class HSpawnService {
         int hSpawnLimit = graph.vertexSet().size();
 
         List<AttributeDependency> newPaths = dependencyService.generateAllPaths(activeAttributesInPattern, hSpawnLimit);
+        // If Vary K, Comment out the following two lines
         List<AttributeDependency> allMinimalDependenciesOnThisPath = patternService.getAllMinimalDependenciesOnThisPath(patternTreeNode);
         newPaths.removeIf(newPath -> dependencyService.isSuperSetOfPath(newPath, allMinimalDependenciesOnThisPath));
 

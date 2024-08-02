@@ -113,7 +113,19 @@ public class AsyncService {
         graph.vertexSet().stream()
                 .filter(vertex -> vertex.getType().equals(centerVertexType) && entityURIs.containsKey(vertex.getUri()) && entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
-                    int diameter = (patternType == PatternType.Line || patternType == PatternType.Circle || patternType == PatternType.Complex) ? 2 : 1;
+                    int diameter;
+                    switch (patternType) {
+                        case Line:
+                        case Circle:
+                            diameter = 2;
+                            break;
+                        case Complex:
+                            diameter = 3;
+                            break;
+                        default:
+                            diameter = 1;
+                            break;
+                    }
                     Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, diameter, validTypes);
                     Set<String> realGraphVertexTypes = subgraph.vertexSet().stream().map(Vertex::getType).collect(Collectors.toSet());
                     if (realGraphVertexTypes.containsAll(validTypes)) {
