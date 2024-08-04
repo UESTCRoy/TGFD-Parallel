@@ -58,6 +58,7 @@ public class HistogramService {
         Map<String, Set<String>> vertexTypesToAttributesMap = new HashMap<>();
         Map<String, Set<String>> attrDistributionMap = new HashMap<>();
         Map<String, Integer> edgeTypesHistogram = new HashMap<>();
+        Map<String, Map<String, Integer>> attrFrequencyMap = new HashMap<>();
 
         // Load the graph's vertices and attributes
         for (Vertex v : graph.vertexSet()) {
@@ -68,7 +69,29 @@ public class HistogramService {
                     .filter(name -> !name.equals("uri"))
                     .peek(attrName -> attrDistributionMap.computeIfAbsent(attrName, k -> new HashSet<>()).add(vertexType))
                     .collect(Collectors.toSet());
-            vertexTypesToAttributesMap.computeIfAbsent(vertexType, k -> new HashSet<>()).addAll(attributeNames);
+
+//            vertexTypesToAttributesMap.computeIfAbsent(vertexType, k -> new HashSet<>()).addAll(attributeNames);
+            for (String attrName : attributeNames) {
+                attrFrequencyMap.computeIfAbsent(vertexType, k -> new HashMap<>())
+                        .merge(attrName, 1, Integer::sum);
+            }
+        }
+
+        Set<String> unwantedAttributes = new HashSet<>(Arrays.asList("lccnid", "viafid", "individualisedgnd"));
+
+        for (Map.Entry<String, Map<String, Integer>> entry : attrFrequencyMap.entrySet()) {
+            String vertexType = entry.getKey();
+            Map<String, Integer> frequencyMap = entry.getValue();
+
+            List<String> topAttributes = frequencyMap.entrySet().stream()
+                    .filter(e -> e.getValue() > 1000)
+                    .filter(e -> !unwantedAttributes.contains(e.getKey()))
+                    .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
+//                    .limit(6)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toList());
+
+            vertexTypesToAttributesMap.put(vertexType, new HashSet<>(topAttributes));
         }
 
         // Load the graph's edges

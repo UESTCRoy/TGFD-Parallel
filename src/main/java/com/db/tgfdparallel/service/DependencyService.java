@@ -138,7 +138,7 @@ public class DependencyService {
     }
 
     public Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> findEntities(AttributeDependency dependency,
-                                                                                                   List<Set<Set<ConstantLiteral>>> matchesPerTimestamps) {
+                                                                                                   List<List<Set<ConstantLiteral>>> matchesPerTimestamps) {
         long startTime = System.currentTimeMillis();
 
         Map<Set<ConstantLiteral>, Map<ConstantLiteral, List<Integer>>> entitiesWithRHSvalues = new HashMap<>();
@@ -148,9 +148,12 @@ public class DependencyService {
         Set<ConstantLiteral> xAttributes = dependency.getLhs();
 
         for (int timestamp = 0; timestamp < matchesPerTimestamps.size(); timestamp++) {
-            Set<Set<ConstantLiteral>> matchesInOneTimeStamp = matchesPerTimestamps.get(timestamp);
+            List<Set<ConstantLiteral>> matchesInOneTimeStamp = matchesPerTimestamps.get(timestamp);
             if (!matchesInOneTimeStamp.isEmpty()) {
                 for (Set<ConstantLiteral> match : matchesInOneTimeStamp) {
+                    if (match == null) {
+                        continue;
+                    }
                     if (match.size() < dependency.getLhs().size() + 1) {
                         continue;
                     }

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -339,7 +340,18 @@ public class DataShipperService {
             List<String> TGFDsFile = activeMQService.receiveTGFDsFromWorker(type);
             for (String fileName : TGFDsFile) {
                 logger.info("Downloading {} TGFDs from {}", type, fileName);
-                Map<Integer, Integer> data = (Map<Integer, Integer>) downloadObject(fileName);
+                Map<Integer, Integer> data = null;
+                try {
+                    data = (Map<Integer, Integer>) downloadObject(fileName);
+                } catch (ClassCastException e) {
+                    logger.error("Error while casting downloaded object from {} to Map<Integer, Integer>: {}", fileName, e.getMessage(), e);
+                }
+
+                if (data == null) {
+                    logger.warn("Downloaded object from {} is null or not a Map<Integer, Integer>", fileName);
+                    continue;
+                }
+
                 logger.info("Got {} {} TGFDs from {}", data.size(), type, fileName);
                 for (Map.Entry<Integer, Integer> entry : data.entrySet()) {
                     obj.merge(entry.getKey(), entry.getValue(), Integer::sum);
@@ -411,15 +423,17 @@ public class DataShipperService {
         return changesData;
     }
 
-    public void awsCoordinatorDataPreparation(List<String> allDataPath, List<String> splitGraphPath, String changeFilePath) {
+    public void awsCoordinatorDataPreparation(List<String> allDataPath, String changeFilePath) {
         logger.info("Downloading Graph Information From S3");
+        long startTime = System.currentTimeMillis();
         // Process allDataPath
         processPaths(allDataPath, "/home/ec2-user/completeGraph/");
         // Process splitGraphPath
-        processPaths(splitGraphPath, "/home/ec2-user/splitGraph/");
+//        processPaths(splitGraphPath, "/home/ec2-user/splitGraph/");
         // Handle changeFile (download entire directory)
         s3Service.downloadObjectsToInstanceDirectory(changeFilePath);
-        logger.info("Finish Download From S3 to Instance");
+        long endTime = System.currentTimeMillis();
+        logger.info("Finish Download From S3 to Instance in {} seconds", TimeUnit.MILLISECONDS.toSeconds(endTime - startTime));
     }
 
     public String workerDataPreparation() {
@@ -438,12 +452,15 @@ public class DataShipperService {
         List<String> allDataPath = config.getAllDataPath();
         List<String> destinationFiles = new ArrayList<>();
         if (isAmazonMode()) {
+            long startTime = System.currentTimeMillis();
             for (String dataPath : allDataPath) {
                 String fileName = getFileNameFromPath(dataPath);
                 String destinationFile = "/home/ec2-user/dataPath/" + fileName;
                 s3Service.downloadFileToInstance(dataPath, destinationFile);
                 destinationFiles.add(destinationFile);
             }
+            long endTime = System.currentTimeMillis();
+            logger.info("Finish Download From S3 to Instance in {} seconds", TimeUnit.MILLISECONDS.toSeconds(endTime - startTime));
             return destinationFiles;
         }
         return allDataPath;

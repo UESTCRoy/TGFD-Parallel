@@ -46,10 +46,17 @@ public class CoordinatorProcess {
         initializeWorkers();
 
         // Graph Path
-        String firstGraphPath = config.getFirstGraphPath();
+        List<String> firstGraphPath = Stream.of(config.getFirstGraphPath()).collect(Collectors.toList());
         String changeFilePath = config.getChangeFilePath();
+        // AWS Data Preparation
+        if (dataShipperService.isAmazonMode()) {
+            changeFilePath = "/home/ec2-user/changeFile";
+            dataShipperService.awsCoordinatorDataPreparation(firstGraphPath, changeFilePath);
+        }
+
+        logger.info("Data Path is {}", firstGraphPath);
         // Generate histogram and send the histogram data to all workers
-        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshots(Stream.of(firstGraphPath).collect(Collectors.toList()));
+        List<Graph<Vertex, RelationshipEdge>> graphLoaders = graphService.loadAllSnapshots(firstGraphPath);
 
         ProcessedHistogramData histogramData = histogramService.computeHistogramAllSnapshot(graphLoaders);
         logger.info("Send the histogram data to the worker");
@@ -102,9 +109,6 @@ public class CoordinatorProcess {
 
         FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
         FileUtil.saveConstantTGFDsToFile(generalTGFDMap, "General-TGFD");
-        if (dataShipperService.isAmazonMode()) {
-            s3Service.stopInstance();
-        }
 
         long endTime = System.currentTimeMillis();
         long durationMillis = endTime - startTime;
@@ -112,6 +116,10 @@ public class CoordinatorProcess {
         long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The coordinator process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
+
+        if (dataShipperService.isAmazonMode()) {
+            s3Service.stopInstance();
+        }
     }
 
     private void initializeWorkers() {
@@ -127,15 +135,25 @@ public class CoordinatorProcess {
         histogramData.getSortedFrequentEdgesHistogram().forEach(edge -> {
             logger.info("Edge: {}", edge);
         });
-        histogramData.getVertexTypesToActiveAttributesMap().forEach((key, value) -> {
+
+        Set<String> frequentVertexType = histogramData.getSortedVertexHistogram().stream()
+                .map(FrequencyStatistics::getType)
+                .collect(Collectors.toSet());
+
+        Map<String, Set<String>> vertexTypesToActiveAttributesMap = histogramData.getVertexTypesToActiveAttributesMap();
+        Map<String, Set<String>> filteredVertexTypesToActiveAttributesMap = vertexTypesToActiveAttributesMap.entrySet().stream()
+                .filter(entry -> frequentVertexType.contains(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        filteredVertexTypesToActiveAttributesMap.forEach((key, value) -> {
             logger.info("Vertex Type: {}, Active Attributes: {}", key, value);
         });
-        Set<String> allAttributes = histogramData.getVertexTypesToActiveAttributesMap().values().stream()
+        histogramData.getVertexTypesToActiveAttributesMap().values().stream()
                 .flatMap(Set::stream)
-                .collect(Collectors.toSet());
-        allAttributes.forEach(attribute -> {
-            logger.info("Attribute: {}", attribute);
-        });
+                .distinct()
+                .forEach(attribute -> {
+                    logger.info("Attribute: {}", attribute);
+                });
     }
 
 }

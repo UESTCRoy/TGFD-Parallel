@@ -203,7 +203,7 @@ public class FastMatchService {
         Map<String, Set<Vertex>> patternVertexToDataVerticesMap = getPatternVertexToDataVerticesMap(pattern, realGraph, centerVertex);
         List<Set<Vertex>> listOfDataVertexSets = new ArrayList<>(patternVertexToDataVerticesMap.values());
 
-        Set<List<Vertex>> allCombinations = MathUtil.cartesianProduct(listOfDataVertexSets);
+        List<List<Vertex>> allCombinations = MathUtil.cartesianProduct(listOfDataVertexSets);
         Set<ConstantLiteral> centerDataVertexLiterals = getCenterDataVertexLiterals(centerVertex, vertexTypesToActiveAttributesMap.get(centerVertexType));
 
         for (List<Vertex> combination : allCombinations) {
@@ -224,7 +224,7 @@ public class FastMatchService {
 
     // Line and Cyclic
     public void findAllMatchesOfLinePatternInSnapshotUsingCenterVertex(VF2PatternGraph pattern, Graph<Vertex, RelationshipEdge> realGraph, Vertex centerVertex, int timestamp,
-                                                                       Set<Set<ConstantLiteral>> matchesAroundCenterVertex, Map<String, List<Integer>> ptnEntityURIs,
+                                                                       List<Set<ConstantLiteral>> matchesAroundCenterVertex, Map<String, List<Integer>> ptnEntityURIs,
                                                                        Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Set<String> patternEdges = pattern.getPattern().edgeSet().stream()
                 .map(edge -> edge.getSource().getType() + edge.getLabel() + edge.getTarget().getType())
@@ -244,7 +244,7 @@ public class FastMatchService {
 
         Set<ConstantLiteral> centerDataVertexLiterals = getCenterDataVertexLiterals(centerVertex, vertexTypesToActiveAttributesMap.get(centerVertex.getType()));
         List<Set<Vertex>> listOfDataVertexSets = new ArrayList<>(patternVertexToDataVerticesMap.values());
-        Set<List<Vertex>> allCombinations = MathUtil.cartesianProduct(listOfDataVertexSets);
+        List<List<Vertex>> allCombinations = MathUtil.cartesianProduct(listOfDataVertexSets);
 
         for (List<Vertex> combination : allCombinations) {
             Set<ConstantLiteral> match = new HashSet<>(centerDataVertexLiterals);
@@ -253,7 +253,7 @@ public class FastMatchService {
                 addAttributesToMatch(vertex.getType(), attributesMap, vertexTypesToActiveAttributesMap.get(vertex.getType()), match);
             }
 
-            if (match.size() > pattern.getPattern().vertexSet().size()) {
+            if (match.size() > centerDataVertexLiterals.size()) {
                 matchesAroundCenterVertex.add(match);
                 updateEntityURIs(centerVertex, ptnEntityURIs, timestamp, match.size());
             }

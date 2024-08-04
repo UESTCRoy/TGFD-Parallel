@@ -101,7 +101,7 @@ public class PatternService {
 //                numOfMatches++;
                 if (entityURI != null) {
                     List<Integer> counts = entityURIs.computeIfAbsent(entityURI, k -> new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
-                    counts.set(timestamp, counts.get(timestamp) + 1);
+                    counts.set(timestamp, counts.get(timestamp) + literalsInMatch.size());
                 }
                 matches.add(literalsInMatch);
             }
@@ -185,7 +185,6 @@ public class PatternService {
             int numberOfWithinMatchesOfEntity = (int) entityUriEntry.getValue().stream().filter(x -> x > 1).count();
             numOfPossiblePairs += numberOfWithinMatchesOfEntity;
         }
-        // TODO: multiple 4(number of workers) or 16(number of workers * number of workers) to the denominator
         return calculateSupport(numOfPossiblePairs, S, T);
     }
 
@@ -203,7 +202,8 @@ public class PatternService {
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
         for (PatternTreeNode ptn : nodes) {
-            if (ptn.isPruned() && level < 3) {
+//            if (ptn.isPruned() && level < 2) {
+            if (ptn.isPruned()) {
                 continue;
             }
             for (String edge : edgeData) {
@@ -249,7 +249,8 @@ public class PatternService {
                     continue;
                 }
 
-                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 3) {
+//                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 2) {
+                if (isSuperGraphOfPrunedPattern(newPattern, patternTree)) {
                     logger.info("Skip. Candidate pattern is a supergraph of pruned pattern");
                     continue;
                 }

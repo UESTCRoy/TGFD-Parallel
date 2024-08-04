@@ -37,7 +37,7 @@ public class AsyncService {
 
     @Async
     public CompletableFuture<Integer> runSnapshotAsync(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
-                                                       Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
+                                                       List<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
                                                        Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         long startTime = System.currentTimeMillis();
         Integer result = runFastMatchSnapshot(snapshotID, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
@@ -100,7 +100,7 @@ public class AsyncService {
     }
 
     public int runFastMatchSnapshot(int snapshotID, PatternTreeNode newPattern, GraphLoader loader,
-                                    Set<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
+                                    List<Set<ConstantLiteral>> matchesOnTimestamps, int level, Map<String, List<Integer>> entityURIs,
                                     Map<String, List<Integer>> ptnEntityURIs, Map<String, Set<String>> vertexTypesToActiveAttributesMap) {
         Graph<Vertex, RelationshipEdge> graph = loader.getGraph().getGraph();
         String centerVertexType = newPattern.getPattern().getCenterVertex().getType();
@@ -116,7 +116,19 @@ public class AsyncService {
         graph.vertexSet().stream()
                 .filter(vertex -> vertex.getType().equals(centerVertexType) && entityURIs.containsKey(vertex.getUri()) && entityURIs.get(vertex.getUri()).get(snapshotID) > 0)
                 .forEach(centerVertex -> {
-                    int diameter = (patternType == PatternType.Line || patternType == PatternType.Circle || patternType == PatternType.Complex) ? 2 : 1;
+                    int diameter;
+                    switch (patternType) {
+                        case Line:
+                        case Circle:
+                            diameter = 2;
+                            break;
+                        case Complex:
+                            diameter = 3;
+                            break;
+                        default:
+                            diameter = 1;
+                            break;
+                    }
                     Graph<Vertex, RelationshipEdge> subgraph = graphService.getSubGraphWithinDiameter(graph, centerVertex, diameter, validTypes);
                     Set<String> realGraphVertexTypes = subgraph.vertexSet().stream().map(Vertex::getType).collect(Collectors.toSet());
                     if (realGraphVertexTypes.containsAll(validTypes)) {
@@ -130,7 +142,7 @@ public class AsyncService {
 
     @Async
     public CompletableFuture<List<List<TGFD>>> findTGFDsAsync(PatternTreeNode patternTreeNode, AttributeDependency newPath,
-                                                              List<Set<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
+                                                              List<List<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
         long startTime = System.currentTimeMillis();
         List<List<TGFD>> result = findTGFDs(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap);
         long endTime = System.currentTimeMillis();
@@ -138,7 +150,7 @@ public class AsyncService {
         return CompletableFuture.completedFuture(result);
     }
 
-    public List<List<TGFD>> findTGFDs(PatternTreeNode patternTreeNode, AttributeDependency newPath, List<Set<Set<ConstantLiteral>>> matchesPerTimestamps,
+    public List<List<TGFD>> findTGFDs(PatternTreeNode patternTreeNode, AttributeDependency newPath, List<List<Set<ConstantLiteral>>> matchesPerTimestamps,
                                       Map<Integer, Integer> dependencyNumberMap) {
         List<List<TGFD>> result = new ArrayList<>();
         result.add(new ArrayList<>());

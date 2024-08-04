@@ -89,28 +89,22 @@ public class HDFSService {
             }
 
             logger.info("File exists, attempting to open: {}/{}", directoryName, fileName);
-
             FSDataInputStream inputStream = fileSystem.open(filePath);
             logger.info("Successfully opened the file: {}/{}", directoryName, fileName);
-            try (ObjectInputStream in = new ObjectInputStream(inputStream)) {
-                obj = in.readObject();
-                logger.info("Object has been successfully deserialized");
-            } catch (IOException e) {
-                logger.error("Error while reading the object from HDFS", e);
-                return null;
-            } catch (ClassNotFoundException e) {
-                logger.error("Error while deserializing the object from HDFS", e);
-                return null;
-            } finally {
-                inputStream.close();
-                logger.info("Input stream closed");
-            }
-
+            obj = deserializeObject(inputStream);
         } catch (IOException e) {
             logger.error("Error while accessing HDFS", e);
             return null;
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
         }
         return obj;
+    }
+
+    public static Object deserializeObject(InputStream objectContent) throws IOException, ClassNotFoundException {
+        try (ObjectInputStream in = new ObjectInputStream(objectContent)) {
+            return in.readObject();
+        }
     }
 
     public StringBuilder downloadWholeTextFile(String directoryName, String fileName) {
