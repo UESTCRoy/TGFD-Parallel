@@ -108,6 +108,7 @@ public class WorkerProcess {
         PatternTree patternTree = new PatternTree();
         patternTree.getTree().get(0).addAll(patternTreeNodes);
         int level = 0;
+        List<Integer> tgfdLevelCount = new ArrayList<>();
         while (level < config.getK()) {
             List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(edgeData, patternTree, level);
             if (vSpawnPatternList.isEmpty()) {
@@ -117,6 +118,7 @@ public class WorkerProcess {
             patternTree.getTree().add(newPatternList);
             level++;
 
+            int currentLevelTGFDCount = 0;
             for (VSpawnPattern vSpawnedPatterns : vSpawnPatternList) {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
@@ -173,8 +175,11 @@ public class WorkerProcess {
                     logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
                             level, newPattern.getPattern().getPattern(), tgfds.get(0).size(), tgfds.get(1).size());
                 }
+                currentLevelTGFDCount += tgfds.get(0).size();
             }
+            tgfdLevelCount.add(currentLevelTGFDCount);
         }
+        logger.info("TGFD Level Count: {}", tgfdLevelCount);
         logger.info("======================================");
         logger.info("The Maximum Level We got is {}", level);
         logger.info("======================================");
@@ -200,7 +205,7 @@ public class WorkerProcess {
         long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
-        FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
+//        FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
 
         if (dataShipperService.isAmazonMode()) {
             s3Service.stopInstance();
