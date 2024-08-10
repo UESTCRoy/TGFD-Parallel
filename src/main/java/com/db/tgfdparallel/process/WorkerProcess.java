@@ -108,6 +108,7 @@ public class WorkerProcess {
         PatternTree patternTree = new PatternTree();
         patternTree.getTree().get(0).addAll(patternTreeNodes);
         int level = 0;
+        List<Integer> tgfdLevelCount = new ArrayList<>();
         while (level < config.getK()) {
             List<VSpawnPattern> vSpawnPatternList = patternService.vSpawnGenerator(edgeData, patternTree, level);
             if (vSpawnPatternList.isEmpty()) {
@@ -117,6 +118,7 @@ public class WorkerProcess {
             patternTree.getTree().add(newPatternList);
             level++;
 
+            int currentLevelTGFDCount = 0;
             for (VSpawnPattern vSpawnedPatterns : vSpawnPatternList) {
                 PatternTreeNode newPattern = vSpawnedPatterns.getNewPattern();
                 Graph<Vertex, RelationshipEdge> pattern = newPattern.getPattern().getPattern();
@@ -128,14 +130,19 @@ public class WorkerProcess {
                 // For Support Computing
                 Map<String, List<Integer>> ptnEntityURIs = new ConcurrentHashMap<>();
 
+                List<CompletableFuture<Integer>> futures = new ArrayList<>();
                 for (int superstep = 0; superstep < config.getTimestamp(); superstep++) {
                     GraphLoader loader = loaders[superstep];
                     List<Set<ConstantLiteral>> matchesOnTimestamps = matchesPerTimestamps.get(superstep);
-                    long findMatchesStartTime = System.currentTimeMillis();
-                    int matches = asyncService.runFastMatchSnapshot(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap);
-                    long findMatchesEndTime = System.currentTimeMillis();
-                    logger.info("Snapshot {}: Found {} matches in {} ms", superstep, matches, findMatchesEndTime - findMatchesStartTime);
+                    int finalSuperstep = superstep;
+                    CompletableFuture<Integer> future = asyncService.runSnapshotAsync(superstep, newPattern, loader, matchesOnTimestamps, level, entityURIs, ptnEntityURIs, vertexTypesToActiveAttributesMap)
+                            .exceptionally(ex -> {
+                                logger.error("Error processing snapshot " + finalSuperstep, ex);
+                                return null;
+                            });
+                    futures.add(future);
                 }
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
                 int numberOfWorker = config.getWorkers().size();
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
@@ -163,8 +170,9 @@ public class WorkerProcess {
                 matchesPerTimestampsByPTN.put(newPattern, matchesPerTimestamps);
 
                 // 计算新pattern的HSpawn
-                List<List<TGFD>> tgfds = hSpawnService.performHSPawn(
+                CompletableFuture<List<List<TGFD>>> futureTGFDs = hSpawnService.performHSPawn(
                         vertexTypesToActiveAttributesMap, newPattern, matchesPerTimestamps, dependencyNumberMap);
+                List<List<TGFD>> tgfds = futureTGFDs.join();
 
                 if (tgfds.size() == 2 && level > 1) {
                     constantTGFDs.addAll(tgfds.get(0));
@@ -173,8 +181,11 @@ public class WorkerProcess {
                     logger.info("Level: {}, Pattern: {}, Size Constant TGFD: {}, Size General TGFD: {}",
                             level, newPattern.getPattern().getPattern(), tgfds.get(0).size(), tgfds.get(1).size());
                 }
+                currentLevelTGFDCount += tgfds.get(0).size();
             }
+            tgfdLevelCount.add(currentLevelTGFDCount);
         }
+        logger.info("TGFD Level Count: {}", tgfdLevelCount);
         logger.info("======================================");
         logger.info("The Maximum Level We got is {}", level);
         logger.info("======================================");
@@ -200,7 +211,7 @@ public class WorkerProcess {
         long minutes = (durationMillis % 3600000) / 60000; // 60000 毫秒/分钟
         long seconds = ((durationMillis % 3600000) % 60000) / 1000;
         logger.info("The worker process has been completed in {} hours, {} minutes, {} seconds", hours, minutes, seconds);
-        FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
+//        FileUtil.saveConstantTGFDsToFile(constantTGFDMap, "Constant-TGFD");
 
         if (dataShipperService.isAmazonMode()) {
             s3Service.stopInstance();

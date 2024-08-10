@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Service
 public class HSpawnService {
@@ -23,26 +25,32 @@ public class HSpawnService {
         this.asyncService = asyncService;
     }
 
-    public List<List<TGFD>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
-                                          List<List<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
+    public CompletableFuture<List<List<TGFD>>> performHSPawn(Map<String, Set<String>> vertexTypesToActiveAttributesMap, PatternTreeNode patternTreeNode,
+                                                             List<List<Set<ConstantLiteral>>> matchesPerTimestamps, Map<Integer, Integer> dependencyNumberMap) {
         Graph<Vertex, RelationshipEdge> graph = patternTreeNode.getPattern().getPattern();
         List<ConstantLiteral> activeAttributesInPattern = new ArrayList<>(patternService.getActiveAttributesInPattern(graph.vertexSet(), false, vertexTypesToActiveAttributesMap));
         int hSpawnLimit = graph.vertexSet().size();
 
         List<AttributeDependency> newPaths = dependencyService.generateAllPaths(activeAttributesInPattern, hSpawnLimit);
+        // If Vary K, Comment out the following two lines
         List<AttributeDependency> allMinimalDependenciesOnThisPath = patternService.getAllMinimalDependenciesOnThisPath(patternTreeNode);
         newPaths.removeIf(newPath -> dependencyService.isSuperSetOfPath(newPath, allMinimalDependenciesOnThisPath));
 
-        List<List<TGFD>> combinedResult = new ArrayList<>();
-        combinedResult.add(new ArrayList<>()); // constant TGFDs
-        combinedResult.add(new ArrayList<>()); // general TGFDs
+        List<CompletableFuture<List<List<TGFD>>>> futures = newPaths.stream()
+                .map(newPath -> asyncService.findTGFDsAsync(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap))
+                .collect(Collectors.toList());
 
-        for (AttributeDependency newPath : newPaths) {
-            List<List<TGFD>> res = asyncService.findTGFDs(patternTreeNode, newPath, matchesPerTimestamps, dependencyNumberMap);
-            combinedResult.get(0).addAll(res.get(0));
-            combinedResult.get(1).addAll(res.get(1));
-        }
-
-        return combinedResult;
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> {
+                    List<List<TGFD>> combinedResult = new ArrayList<>();
+                    combinedResult.add(new ArrayList<>()); // constant TGFDs
+                    combinedResult.add(new ArrayList<>()); // general TGFDs
+                    futures.forEach(future -> {
+                        List<List<TGFD>> res = future.join();
+                        combinedResult.get(0).addAll(res.get(0));
+                        combinedResult.get(1).addAll(res.get(1));
+                    });
+                    return combinedResult;
+                });
     }
 }
