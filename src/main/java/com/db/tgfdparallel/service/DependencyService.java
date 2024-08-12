@@ -137,12 +137,12 @@ public class DependencyService {
         }
     }
 
-    public Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> findEntities(AttributeDependency dependency,
+    public Map<List<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> findEntities(AttributeDependency dependency,
                                                                                                    List<List<Set<ConstantLiteral>>> matchesPerTimestamps) {
         long startTime = System.currentTimeMillis();
 
-        Map<Set<ConstantLiteral>, Map<ConstantLiteral, List<Integer>>> entitiesWithRHSvalues = new HashMap<>();
-        Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entitiesWithSortedRHSvalues = new HashMap<>();
+        Map<List<ConstantLiteral>, Map<ConstantLiteral, List<Integer>>> entitiesWithRHSvalues = new HashMap<>();
+        Map<List<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entitiesWithSortedRHSvalues = new HashMap<>();
         String yVertexType = dependency.getRhs().getVertexType();
         String yAttrName = dependency.getRhs().getAttrName();
         Set<ConstantLiteral> xAttributes = dependency.getLhs();
@@ -173,13 +173,15 @@ public class DependencyService {
                     if (entity.size() < xAttributes.size() || rhs == null) {
                         continue;
                     }
+                    List<ConstantLiteral> sortedEntity = new ArrayList<>(entity);
+                    Collections.sort(sortedEntity);
 
 //                    entitiesWithRHSvalues.get(entity).get(rhs).set(timestamp, entitiesWithRHSvalues.get(entity).get(rhs).get(timestamp) + 1);
-                    Map<ConstantLiteral, List<Integer>> entityRHSvalues = entitiesWithRHSvalues.getOrDefault(entity, new HashMap<>());
+                    Map<ConstantLiteral, List<Integer>> entityRHSvalues = entitiesWithRHSvalues.getOrDefault(sortedEntity, new HashMap<>());
                     List<Integer> rhsValues = entityRHSvalues.getOrDefault(rhs, new ArrayList<>(Collections.nCopies(config.getTimestamp(), 0)));
                     rhsValues.set(timestamp, rhsValues.get(timestamp) + 1);
                     entityRHSvalues.put(rhs, rhsValues);
-                    entitiesWithRHSvalues.put(entity, entityRHSvalues);
+                    entitiesWithRHSvalues.put(sortedEntity, entityRHSvalues);
                 }
             }
         }
@@ -193,7 +195,7 @@ public class DependencyService {
                                         .stream()
                                         .reduce(0, Integer::sum);
 
-        for (Map.Entry<Set<ConstantLiteral>, Map<ConstantLiteral, List<Integer>>> entityEntry : entitiesWithRHSvalues.entrySet()) {
+        for (Map.Entry<List<ConstantLiteral>, Map<ConstantLiteral, List<Integer>>> entityEntry : entitiesWithRHSvalues.entrySet()) {
             Map<ConstantLiteral, List<Integer>> rhsMapOfEntity = entityEntry.getValue();
             List<Map.Entry<ConstantLiteral, List<Integer>>> sortedRhsMapOfEntity = rhsMapOfEntity.entrySet()
                     .stream()

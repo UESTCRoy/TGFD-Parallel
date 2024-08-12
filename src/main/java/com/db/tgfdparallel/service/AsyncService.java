@@ -156,7 +156,7 @@ public class AsyncService {
         result.add(new ArrayList<>());
         result.add(new ArrayList<>());
 
-        Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = dependencyService.findEntities(newPath, matchesPerTimestamps);
+        Map<List<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities = dependencyService.findEntities(newPath, matchesPerTimestamps);
         List<Pair> candidatePairs = new ArrayList<>();
 
         int dependencyKey = tgfdService.generateDependencyKey(newPath);

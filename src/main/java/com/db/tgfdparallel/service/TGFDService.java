@@ -29,7 +29,7 @@ public class TGFDService {
     }
 
     public Set<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
-                                          Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs, int dependencyKey) {
+                                          Map<List<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs, int dependencyKey) {
         long startTime = System.currentTimeMillis();
 
         Set<TGFD> result = new HashSet<>();
@@ -38,8 +38,8 @@ public class TGFDService {
 //        List<AttributeDependency> allMinimalConstantDependenciesOnThisPath = patternService.getAllMinimalConstantDependenciesOnThisPath(patternNode);
         double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
 
-        for (Map.Entry<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
-            Set<ConstantLiteral> xLiterals = entityEntry.getKey();
+        for (Map.Entry<List<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
+            List<ConstantLiteral> xLiterals = entityEntry.getKey();
             List<Map.Entry<ConstantLiteral, List<Integer>>> rhsAttrValuesTimestampsSortedByFreq = entityEntry.getValue();
 
             long rhsDiscoveryStartTime = System.currentTimeMillis();
@@ -102,7 +102,7 @@ public class TGFDService {
     }
 
     public void generateDataDependency(String attrValue, ConstantLiteral yLiteral, VF2PatternGraph newPattern, DataDependency newDependency,
-                                       AttributeDependency constantPath, Set<ConstantLiteral> xLiterals) {
+                                       AttributeDependency constantPath, List<ConstantLiteral> xLiterals) {
         Map<String, ConstantLiteral> vertexTypeToLiteral = new HashMap<>();
         String yVertexType = yLiteral.getVertexType();
         String yAttrName = yLiteral.getAttrName();
