@@ -148,12 +148,16 @@ public class CoordinatorProcess {
         filteredVertexTypesToActiveAttributesMap.forEach((key, value) -> {
             logger.info("Vertex Type: {}, Active Attributes: {}", key, value);
         });
-        histogramData.getVertexTypesToActiveAttributesMap().values().stream()
+        Set<String> uniqueAttributes = histogramData.getVertexTypesToActiveAttributesMap().values().stream()
                 .flatMap(Set::stream)
-                .distinct()
-                .forEach(attribute -> {
-                    logger.info("Attribute: {}", attribute);
-                });
+                .collect(Collectors.toSet());
+
+        uniqueAttributes.forEach(attribute -> {
+            logger.info("Attribute: {}", attribute);
+        });
+
+        long attributeCount = uniqueAttributes.size();
+        logger.info("Total unique Attributes count: {}", attributeCount);
     }
 
 }
