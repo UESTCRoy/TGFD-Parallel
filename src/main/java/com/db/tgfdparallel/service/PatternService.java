@@ -457,7 +457,7 @@ public class PatternService {
 
         for (int i = patternTree.getTree().size() - 1; i >= 0; i--) {
             for (PatternTreeNode treeNode : patternTree.getTree().get(i)) {
-                if (treeNode.isPruned() && treeNode.getPattern().getCenterVertexType().equals(newPattern.getCenterVertexType())) {
+                if (treeNode.isPruned()) {
                     Set<String> otherPatternEdges = treeNode.getPattern().getPattern().edgeSet().stream()
                             .map(Object::toString)
                             .collect(Collectors.toSet());

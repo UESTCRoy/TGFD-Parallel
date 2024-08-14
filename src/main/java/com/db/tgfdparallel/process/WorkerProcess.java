@@ -97,7 +97,7 @@ public class WorkerProcess {
         for (int i = 0; i < config.getTimestamp(); i++) {
             patternService.singleNodePatternInitialization(loaders[i].getGraph(), i, patternTreeNodeMap, entityURIsByPTN);
         }
-        evaluatePatternSupport(patternTreeNodes, vertexHistogram);
+//        evaluatePatternSupport(patternTreeNodes, vertexHistogram);
 
         Set<TGFD> constantTGFDs = new HashSet<>();
         Set<TGFD> generalTGFDs = new HashSet<>();
@@ -141,10 +141,10 @@ public class WorkerProcess {
 
                 int numberOfWorker = config.getWorkers().size();
                 // 计算new Pattern的support，然后判断与theta的关系，如果support不够，则把ptn设为pruned
-//                double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
-//                        vertexHistogram.get(newPattern.getPattern().getCenterVertex().getType()), config.getTimestamp()) * numberOfWorker;
                 double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
-                        vertexHistogram.get(newPattern.getPattern().getCenterVertexType()), config.getTimestamp());
+                        vertexHistogram.get(newPattern.getPattern().getCenterVertex().getType()), config.getTimestamp()) * numberOfWorker;
+//                double newPatternSupport = patternService.calculatePatternSupport(ptnEntityURIs,
+//                        vertexHistogram.get(newPattern.getPattern().getCenterVertex().getType()), config.getTimestamp());
 
                 logger.info("The pattern support for pattern: {} is {} and centerVertex is {}", pattern, newPatternSupport, centerVertexType);
                 newPattern.setPatternSupport(newPatternSupport);
@@ -265,7 +265,7 @@ public class WorkerProcess {
                     entityURIsByPTN.get(centerVertexType),
                     vertexHistogram.get(ptn.getPattern().getCenterVertexType()),
                     config.getTimestamp()
-            );
+            ) * config.getWorkers().size();
             if (patternSupport < config.getPatternTheta()) {
                 ptn.setPruned(true);
                 logger.info("Pruned pattern {} due to insufficient support.", ptn.getPattern().getPattern());
