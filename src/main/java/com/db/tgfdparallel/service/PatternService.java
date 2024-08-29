@@ -202,7 +202,6 @@ public class PatternService {
         List<PatternTreeNode> nodes = patternTree.getTree().get(level);
 
         for (PatternTreeNode ptn : nodes) {
-//            if (ptn.isPruned() && level < 2) {
             if (ptn.isPruned()) {
                 continue;
             }
@@ -249,7 +248,6 @@ public class PatternService {
                     continue;
                 }
 
-//                if (isSuperGraphOfPrunedPattern(newPattern, patternTree) && level < 2) {
                 if (isSuperGraphOfPrunedPattern(newPattern, patternTree)) {
                     logger.info("Skip. Candidate pattern is a supergraph of pruned pattern");
                     continue;
@@ -459,7 +457,7 @@ public class PatternService {
 
         for (int i = patternTree.getTree().size() - 1; i >= 0; i--) {
             for (PatternTreeNode treeNode : patternTree.getTree().get(i)) {
-                if (treeNode.isPruned() && treeNode.getPattern().getCenterVertexType().equals(newPattern.getCenterVertexType())) {
+                if (treeNode.isPruned()) {
                     Set<String> otherPatternEdges = treeNode.getPattern().getPattern().edgeSet().stream()
                             .map(Object::toString)
                             .collect(Collectors.toSet());

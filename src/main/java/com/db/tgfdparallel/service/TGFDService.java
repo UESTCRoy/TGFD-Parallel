@@ -29,23 +29,18 @@ public class TGFDService {
     }
 
     public Set<TGFD> discoverConstantTGFD(PatternTreeNode patternNode, ConstantLiteral yLiteral,
-                                          Map<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs, int dependencyKey) {
-        long startTime = System.currentTimeMillis();
-
+                                          Map<List<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entities, List<Pair> candidatePairs, int dependencyKey) {
         Set<TGFD> result = new HashSet<>();
         int level = patternNode.getPattern().getPattern().vertexSet().size();
         VF2PatternGraph pattern = patternNode.getPattern();
-//        List<AttributeDependency> allMinimalConstantDependenciesOnThisPath = patternService.getAllMinimalConstantDependenciesOnThisPath(patternNode);
         double supportThreshold = config.getTgfdTheta() / config.getWorkers().size();
 
-        for (Map.Entry<Set<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
-            Set<ConstantLiteral> xLiterals = entityEntry.getKey();
+        for (Map.Entry<List<ConstantLiteral>, List<Map.Entry<ConstantLiteral, List<Integer>>>> entityEntry : entities.entrySet()) {
+            List<ConstantLiteral> xLiterals = entityEntry.getKey();
             List<Map.Entry<ConstantLiteral, List<Integer>>> rhsAttrValuesTimestampsSortedByFreq = entityEntry.getValue();
 
-            long rhsDiscoveryStartTime = System.currentTimeMillis();
             // 不管rhsAttrValuesTimestampsSortedByFreq的size，也计算Delta，对每个都转成TGFD，然后support返回给Coordinator处理
-
-            // TODO: Deal with multiple rhs
+            Set<TGFD> tmp = new HashSet<>();
             for (Map.Entry<ConstantLiteral, List<Integer>> entry : rhsAttrValuesTimestampsSortedByFreq) {
 //                VF2PatternGraph newPattern = DeepCopyUtil.deepCopy(pattern);
                 DataDependency newDependency = new DataDependency();
@@ -79,30 +74,59 @@ public class TGFDService {
                 Delta candidateTGFDdelta = new Delta(Period.ofYears(minDistance), Period.ofYears(maxDistance));
                 constantPath.setDelta(candidateTGFDdelta);
 
-//                long constantTGFDKeyStartTime = System.currentTimeMillis();
-//                if (dependencyService.isSuperSetOfPathAndSubsetOfDelta(constantPath, allMinimalConstantDependenciesOnThisPath)) {
-//                    logger.info("WE CANNOT SKIP THIS STEP!!");
-//                    continue;
-//                }
-//                long constantTGFDKeyEndTime = System.currentTimeMillis();
-//                logger.info("Time taken to check super set of path and subset of delta: {} ms", (constantTGFDKeyEndTime - constantTGFDKeyStartTime));
+                // Coordinator处，delta, support 需要重新计算
+                TGFD candidateConstantTGFD = new TGFD(minMaxPair, newDependency, 0.0, level, dependencyKey, (int) numberOfPairs);
+                tmp.add(candidateConstantTGFD);
+            }
 
-//                patternService.addMinimalConstantDependency(patternNode, constantPath);
+            removeOverlappingDeltas(tmp);
+            if (tmp.isEmpty()) {
+                // 把第一个最频繁的加入
+                Map.Entry<ConstantLiteral, List<Integer>> constantLiteralListEntry = rhsAttrValuesTimestampsSortedByFreq.get(0);
+
+                DataDependency newDependency = new DataDependency();
+                AttributeDependency constantPath = new AttributeDependency();
+
+                // 处理Dependency
+                String yAttrValue = constantLiteralListEntry.getKey().getAttrValue();
+                generateDataDependency(yAttrValue, yLiteral, pattern, newDependency, constantPath, xLiterals);
+
+                // 处理Delta
+                List<Integer> values = constantLiteralListEntry.getValue();
+                Pair minMaxPair = getMinMaxPair(values);
+                if (minMaxPair == null) {
+                    continue;
+                }
+                int minDistance = minMaxPair.getMin();
+                int maxDistance = minMaxPair.getMax();
+
+                long numberOfPairs = MathUtil.countPairs(values);
+                double tgfdSupport = calculateTGFDSupport(numberOfPairs, entities.size(), config.getTimestamp());
+                if (tgfdSupport < supportThreshold) {
+//                    logger.info("TGFD support is less than the threshold. TGFD support: {}  **  Threshold: {}", tgfdSupport, supportThreshold);
+                    continue;
+                }
+
+                // 处理deltaToPairsMap，为后续生成generalTGFDs
+                if (minDistance <= maxDistance) {
+                    candidatePairs.add(minMaxPair);
+                }
+
+                Delta candidateTGFDdelta = new Delta(Period.ofYears(minDistance), Period.ofYears(maxDistance));
+                constantPath.setDelta(candidateTGFDdelta);
 
                 // Coordinator处，delta, support 需要重新计算
                 TGFD candidateConstantTGFD = new TGFD(minMaxPair, newDependency, 0.0, level, dependencyKey, (int) numberOfPairs);
                 result.add(candidateConstantTGFD);
+            } else {
+                result.addAll(tmp);
             }
-            long rhsDiscoveryEndTime = System.currentTimeMillis();
         }
-        long endTime = System.currentTimeMillis();
-//        logger.info("Time taken to discover constant TGFDs: {} ms, there are {} entities", (endTime - startTime), entities.size());
-
         return result;
     }
 
     public void generateDataDependency(String attrValue, ConstantLiteral yLiteral, VF2PatternGraph newPattern, DataDependency newDependency,
-                                       AttributeDependency constantPath, Set<ConstantLiteral> xLiterals) {
+                                       AttributeDependency constantPath, List<ConstantLiteral> xLiterals) {
         Map<String, ConstantLiteral> vertexTypeToLiteral = new HashMap<>();
         String yVertexType = yLiteral.getVertexType();
         String yAttrName = yLiteral.getAttrName();

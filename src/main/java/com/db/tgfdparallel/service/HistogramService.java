@@ -78,6 +78,7 @@ public class HistogramService {
         }
 
         Set<String> unwantedAttributes = new HashSet<>(Arrays.asList("lccnid", "viafid", "individualisedgnd"));
+        unwantedAttributes.forEach(attrDistributionMap::remove);
 
         for (Map.Entry<String, Map<String, Integer>> entry : attrFrequencyMap.entrySet()) {
             String vertexType = entry.getKey();
