@@ -1,0 +1,1 @@
+nohup /usr/local/jdk-21.0.4/bin/java -Xms210g -Xmx210g -jar /home/wang851/amie3.5.1.jar /home/wang851/data/amie/1m_imdb/imdb-170909.ttl
