@@ -163,7 +163,6 @@ public class AsyncService {
         dependencyNumberMap.put(dependencyKey, entities.size());
 
         Set<TGFD> constantTGFD = tgfdService.discoverConstantTGFD(patternTreeNode, newPath.getRhs(), entities, candidatePairs, dependencyKey);
-//        logger.info("There are {} constant TGFDs discovered for dependency {}", constantTGFD.size(), newPath);
         result.get(0).addAll(constantTGFD);
 
         if (!candidatePairs.isEmpty()) {
